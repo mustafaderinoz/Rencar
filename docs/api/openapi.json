@@ -1,0 +1,2181 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "AppController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Servis sağlık kontrolü (probe için)",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "description": "Kullanıcıyı PENDING rolüyle oluşturur ve hemen bir JWT döner. PENDING kullanıcılar giriş yapabilir ancak korumalı (ör. CUSTOMER) işlemleri yapamaz.",
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kayıt başarılı, token üretildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "E-posta zaten kayıtlı."
+          }
+        },
+        "summary": "Yeni kullanıcı kaydı",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "description": "PAROLASIZ giriş: telefon numarası kayıtlıysa 6 haneli doğrulama kodu \"SMS ile gönderilir\" (SİMÜLASYON: gerçek SMS sağlayıcısı yoktur, kod sabittir — varsayılan **123456**, OTP_DEFAULT_CODE env ile değişir). Token DÖNMEZ; kodu POST /auth/verify-otp ucuna gönderin.\n\nKod 5 dakika geçerlidir ve tek kullanımlıktır; yeniden login olmak önceki kodu iptal edip yenisini üretir.",
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Telefon kayıtlı; kod \"gönderildi\", verify-otp bekleniyor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OtpRequiredResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bu telefon numarasına kayıtlı kullanıcı yok."
+          }
+        },
+        "summary": "Giriş yap (1. adım: telefona SMS kodu gönder — simülasyon)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/verify-otp": {
+      "post": {
+        "description": "Telefon + 6 haneli kodu doğrular ve access + refresh token çiftini döner. SMS simüle edildiğinden kod varsayılan olarak **123456**'dır.\n\n401 senaryoları: kod yanlış, süresi dolmuş (5 dk), zaten kullanılmış veya yanlış deneme eşiği (5) aşılmış. Eşik aşımında yeniden login olup yeni kod almak gerekir.",
+        "operationId": "AuthController_verifyOtp",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kod doğru; token çifti üretildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Kod geçersiz veya süresi dolmuş."
+          }
+        },
+        "summary": "Giriş yap (2. adım: SMS kodunu doğrula)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "description": "Geçerli bir refresh token karşılığında YENİ bir access + refresh çifti döner; gönderilen refresh token artık geçersizdir (rotation). Yeni access token'ın rolü DB'den okunur: ehliyet onayı sonrası kullanıcı şifre girmeden bu uçtan CUSTOMER token'ı alabilir.\n\n401 senaryoları: imza geçersiz/süresi dolmuş; VEYA daha önce yenilenmiş (artık iptal) bir refresh token tekrar kullanılırsa — bu durumda güvenlik gereği o oturum zincirindeki (family) tüm token'lar iptal edilir.",
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Yeni access + refresh çifti üretildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token geçersiz/süresi dolmuş veya yeniden kullanılmış (reuse)."
+          }
+        },
+        "summary": "Token yenile (rotation)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "description": "Kullanıcının tüm aktif refresh oturumlarını iptal eder. Eldeki access token yalnızca kısa ömrü dolana kadar geçerli kalır; sonrasında /auth/refresh ile yenilenemez.",
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Çıkış yapıldı; aktif refresh oturumları iptal edildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Çıkış yap",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "description": "Geçerli token sahibinin profilini ve rolünü döner.",
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Kullanıcı bilgisi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Mevcut kullanıcı bilgisi",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/admin/ping": {
+      "get": {
+        "description": "Yalnızca ADMIN rolü erişebilir. Rol guard'ının çalıştığını gösterir.",
+        "operationId": "AdminController_ping",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "ADMIN erişimi başarılı."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Admin test endpoint",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/customer/ping": {
+      "get": {
+        "description": "Yalnızca CUSTOMER rolü erişebilir. PENDING kullanıcılar 403 alır — ehliyet onayı ileride PENDING -\u003E CUSTOMER yükseltmesini sağlayacak.",
+        "operationId": "CustomerController_ping",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "CUSTOMER erişimi başarılı."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar (ör. PENDING) 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Customer test endpoint",
+        "tags": [
+          "Customer"
+        ]
+      }
+    },
+    "/license/upload": {
+      "post": {
+        "description": "Giriş yapmış kullanıcı ehliyet fotoğraflarını yükler; kayıt UNDER_REVIEW durumuna geçer. Kullanıcı zaten CUSTOMER ise veya hâlihazırda incelemede bir kaydı varsa işlem engellenir. REJECTED durumundaki kullanıcı yeniden yükleyebilir (durum yeniden UNDER_REVIEW olur, red gerekçesi silinir).",
+        "operationId": "LicenseController_upload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Ehliyetin ön (front) ve arka (back) yüz fotoğrafları.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadLicenseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Yükleme alındı, ehliyet incelemeye gönderildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LicenseResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dosya eksik veya tipi geçersiz (jpg/png değil)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "409": {
+            "description": "Kullanıcı zaten CUSTOMER veya ehliyeti hâlihazırda incelemede."
+          },
+          "413": {
+            "description": "Dosya boyutu çok büyük (maksimum 5MB)."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ehliyet yükle (ön + arka)",
+        "tags": [
+          "License"
+        ]
+      }
+    },
+    "/license/status": {
+      "get": {
+        "description": "Mevcut kullanıcının ehliyet durumunu döner (NOT_SUBMITTED / UNDER_REVIEW / APPROVED / REJECTED) ve varsa red gerekçesini.",
+        "operationId": "LicenseController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Ehliyet durumu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LicenseStatusResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ehliyet durumumu getir",
+        "tags": [
+          "License"
+        ]
+      }
+    },
+    "/admin/licenses": {
+      "get": {
+        "description": "Duruma göre filtrelenebilir ehliyet listesi (kullanıcı bilgisi ve görsel URL'leri ile). Bekleyenler için ?status=UNDER_REVIEW kullanın.",
+        "operationId": "AdminLicenseController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Duruma göre filtreler. Boş bırakılırsa tüm ehliyetler döner. Bekleyenler için UNDER_REVIEW kullanın.",
+            "schema": {
+              "example": "UNDER_REVIEW",
+              "type": "string",
+              "enum": [
+                "NOT_SUBMITTED",
+                "UNDER_REVIEW",
+                "APPROVED",
+                "REJECTED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminLicenseResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ehliyetleri listele",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/licenses/{id}": {
+      "get": {
+        "description": "Tek bir ehliyet kaydının detayını döner.",
+        "operationId": "AdminLicenseController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLicenseResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Ehliyet kaydı bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ehliyet detayı",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/licenses/{id}/approve": {
+      "patch": {
+        "description": "Ehliyeti APPROVED yapar VE kullanıcıyı PENDING -\u003E CUSTOMER yükseltir (tek transaction içinde). reviewedAt set edilir.",
+        "operationId": "AdminLicenseController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Onaylandı; kullanıcı CUSTOMER oldu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLicenseResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Yalnızca UNDER_REVIEW durumundaki ehliyetler onaylanabilir."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Ehliyet kaydı bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ehliyeti onayla",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/licenses/{id}/reject": {
+      "patch": {
+        "description": "Ehliyeti REJECTED yapar ve gerekçeyi kaydeder. Kullanıcı PENDING kalır; yeniden yükleme yapabilir.",
+        "operationId": "AdminLicenseController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectLicenseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reddedildi; gerekçe kaydedildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLicenseResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Gerekçe geçersiz veya yalnızca UNDER_REVIEW ehliyetler reddedilebilir."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Ehliyet kaydı bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Ehliyeti reddet",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/vehicles": {
+      "post": {
+        "description": "Yeni araç ekler. Plaka benzersizdir; aynı plakayla ikinci kez eklenirse 409 döner. status verilmezse AVAILABLE olur.",
+        "operationId": "AdminVehicleController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVehicleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Araç oluşturuldu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz gövde (validation)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "409": {
+            "description": "Bu plakaya sahip araç zaten var."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Araç oluştur",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "get": {
+        "description": "Durumdan bağımsız tüm araçlar. Tip/durum ile filtrelenebilir, opsiyonel sayfalama (page/limit).",
+        "operationId": "AdminVehicleController_list",
+        "parameters": [
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Tipe göre filtreler.",
+            "schema": {
+              "example": "SUV",
+              "type": "string",
+              "enum": [
+                "SEDAN",
+                "SUV",
+                "HATCHBACK",
+                "STATION",
+                "MINIVAN"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Duruma göre filtreler. Boş bırakılırsa tüm araçlar döner.",
+            "schema": {
+              "example": "AVAILABLE",
+              "type": "string",
+              "enum": [
+                "AVAILABLE",
+                "RENTED",
+                "MAINTENANCE"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Sayfa (1'den başlar).",
+            "schema": {
+              "minimum": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Sayfa başına kayıt (1..100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VehicleResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Araçları listele (tümü)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/vehicles/{id}": {
+      "get": {
+        "description": "Tek aracın detayı.",
+        "operationId": "AdminVehicleController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Araç bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Araç detayı",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "patch": {
+        "description": "Yalnızca gönderilen alanlar güncellenir (kısmi). status burada değiştirilebilir (ör. AVAILABLE -\u003E MAINTENANCE). Plaka çakışırsa 409.",
+        "operationId": "AdminVehicleController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVehicleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Güncellendi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz gövde (validation)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Araç bulunamadı."
+          },
+          "409": {
+            "description": "Bu plakaya sahip başka araç var."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Aracı güncelle",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "delete": {
+        "description": "Aracı kalıcı olarak siler.",
+        "operationId": "AdminVehicleController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Silindi (gövde yok)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Araç bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Aracı sil",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/vehicles": {
+      "get": {
+        "description": "Yalnızca AVAILABLE araçları döner (müsaitlik = status AVAILABLE). RENTED/MAINTENANCE araçlar görünmez. Tipe göre filtre + sayfalama desteklenir; durum filtresi müşteriye AÇIK DEĞİLDİR.",
+        "operationId": "VehicleController_list",
+        "parameters": [
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Tipe göre filtreler.",
+            "schema": {
+              "example": "SUV",
+              "type": "string",
+              "enum": [
+                "SEDAN",
+                "SUV",
+                "HATCHBACK",
+                "STATION",
+                "MINIVAN"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Sayfa (1'den başlar).",
+            "schema": {
+              "minimum": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Sayfa başına kayıt (1..100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VehicleResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar (ör. PENDING) 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Müsait araçları listele",
+        "tags": [
+          "Vehicles"
+        ]
+      }
+    },
+    "/vehicles/{id}": {
+      "get": {
+        "description": "Tek bir AVAILABLE aracın detayı. Araç müsait değilse (RENTED/MAINTENANCE) veya yoksa 404 döner.",
+        "operationId": "VehicleController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar (ör. PENDING) 403 alır."
+          },
+          "404": {
+            "description": "Araç bulunamadı veya müsait değil."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Müsait araç detayı",
+        "tags": [
+          "Vehicles"
+        ]
+      }
+    },
+    "/rentals": {
+      "post": {
+        "description": "Seçilen aracı ANINDA kiralar. startDate sunucuda now'dur; yalnızca vehicleId + endDate gönderilir. Araç AVAILABLE değilse veya kullanıcının zaten aktif bir kiralaması varsa 409 döner. Fiyat oluştururken kilitlenir.",
+        "operationId": "RentalController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRentalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kiralama oluşturuldu; araç RENTED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz gövde (ör. endDate geçmişte)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar (ör. PENDING) 403 alır."
+          },
+          "404": {
+            "description": "Araç bulunamadı."
+          },
+          "409": {
+            "description": "Araç müsait değil VEYA zaten aktif bir kiralamanız var."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Araç kirala (anlık)",
+        "tags": [
+          "Rentals"
+        ]
+      },
+      "get": {
+        "description": "Giriş yapan müşterinin tüm kiralamaları (yeniden eskiye).",
+        "operationId": "RentalController_listMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RentalResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kiralamalarım",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/rentals/{id}/return": {
+      "post": {
+        "description": "Aktif kiralamayı tamamlar (COMPLETED) ve aracı tekrar AVAILABLE yapar. totalPrice değişmez (geç iade ücreti yoktur). Kiralama size ait değilse 403, yoksa 404, zaten iade/iptal ise 409.",
+        "operationId": "RentalController_return",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "İade alındı; kiralama COMPLETED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "Kiralama bu kullanıcıya ait değil."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          },
+          "409": {
+            "description": "Yalnızca aktif kiralamalar iade edilebilir."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kiralamayı iade et",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/rentals/{id}": {
+      "get": {
+        "description": "Tek kiralamanın detayı. Başka kullanıcının kiralaması 404 döner.",
+        "operationId": "RentalController_getMine",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kiralamam (detay)",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/admin/rentals": {
+      "get": {
+        "description": "Tüm kiralamalar; status/userId/vehicleId ile filtrelenebilir, opsiyonel sayfalama. Kullanıcı ve araç özetleriyle döner.",
+        "operationId": "AdminRentalController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Duruma göre filtreler.",
+            "schema": {
+              "example": "ACTIVE",
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Belirli kullanıcının kiralamaları.",
+            "schema": {
+              "example": "clx0usr1234567890",
+              "type": "string"
+            }
+          },
+          {
+            "name": "vehicleId",
+            "required": false,
+            "in": "query",
+            "description": "Belirli aracın kiralamaları.",
+            "schema": {
+              "example": "clx0veh1234567890",
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Sayfa (1'den başlar).",
+            "schema": {
+              "minimum": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Sayfa başına kayıt (1..100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "example": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminRentalResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kiralamaları listele (tümü)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/rentals/{id}": {
+      "get": {
+        "description": "Tek kiralamanın detayı (kullanıcı + araç özetiyle).",
+        "operationId": "AdminRentalController_getOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRentalResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kiralama detayı",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/locations": {
+      "get": {
+        "description": "Simülasyondaki tüm araçların O ANKİ konumlarını döner. WebSocket akışı Swagger'da test edilemediği için bu REST snapshot eğitim/test amaçlıdır; WS ile aynı veriyi (tek seferlik) verir.",
+        "operationId": "AdminLocationController_snapshot",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VehiclePositionDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Anlık araç konumları (snapshot)",
+        "tags": [
+          "Admin"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Araç Kiralama API",
+    "description": "Araç kiralama uygulamasının backend API dokümantasyonu.\n\nKimlik doğrulama JWT (Bearer) iledir. Giriş PAROLASIZ ve İKİ adımlıdır: önce **Auth \u003E /auth/login** ile telefon numaranıza SMS kodu \"gönderin\" (simülasyon — kod sabittir: **123456**), ardından **/auth/verify-otp** ile telefon + kodu gönderip token alın (/auth/register token'ı doğrudan döner). Son olarak sağ üstteki **Authorize** butonuna token'ı girin; korumalı endpoint'ler aktifleşecektir.",
+    "version": "1.0",
+    "contact": {
+
+    }
+  },
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Kayıt, giriş ve mevcut kullanıcı bilgisi"
+    },
+    {
+      "name": "Admin",
+      "description": "Yalnızca ADMIN rolünün eriştiği uçlar"
+    },
+    {
+      "name": "Customer",
+      "description": "Yalnızca CUSTOMER rolünün eriştiği uçlar"
+    },
+    {
+      "name": "Vehicles",
+      "description": "Müşteriye açık araç listeleme/detay (yalnız müsait)"
+    },
+    {
+      "name": "Rentals",
+      "description": "Müşterinin kiralama oluşturma/iade ve kendi kiralamaları"
+    }
+  ],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "access-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "in": "header",
+        "description": "JWT erişim token'ını girin (Bearer öneki olmadan)."
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Kullanıcının e-posta adresi (benzersiz olmalı).",
+            "example": "ahmet.yilmaz@example.com",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "description": "Parola (en az 6 karakter).",
+            "example": "Sifre123!",
+            "minLength": 6,
+            "maxLength": 72
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Kullanıcının ad soyadı.",
+            "example": "Ahmet Yılmaz"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Telefon numarası (benzersiz olmalı). Login OTP akışı telefonla başladığından ZORUNLUDUR; telefonsuz kullanıcı giriş yapamaz.",
+            "example": "+905551112233"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "fullName",
+          "phone"
+        ]
+      },
+      "UserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0a1b2c3d4e5f6g7h8i9j0k"
+          },
+          "email": {
+            "type": "string",
+            "example": "ahmet.yilmaz@example.com"
+          },
+          "phone": {
+            "type": "object",
+            "example": "+905551112233",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Ahmet Yılmaz"
+          },
+          "role": {
+            "type": "string",
+            "description": "Kullanıcının rolü.",
+            "enum": [
+              "PENDING",
+              "CUSTOMER",
+              "ADMIN"
+            ],
+            "example": "PENDING"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-26T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-26T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Korumalı endpoint çağrılarında kullanılacak kısa ömürlü JWT (~15dk).",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Access token süresi dolunca POST /auth/refresh ile yeni çift almak için kullanılan uzun ömürlü token (~7g). Güvenli saklayın.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponseDto"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "user"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Kayıtlı telefon numarası. Doğrulama kodu bu numaraya \"gönderilir\".",
+            "example": "+905550000000"
+          }
+        },
+        "required": [
+          "phone"
+        ]
+      },
+      "OtpRequiredResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Bilgilendirme mesajı.",
+            "example": "Doğrulama kodu SMS ile gönderildi (simülasyon)."
+          },
+          "phone": {
+            "type": "string",
+            "description": "Kodun gönderildiği (verify-otp adımında da kullanılacak) telefon.",
+            "example": "+905550000000"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Kodun geçerlilik sonu (UTC). Sonrasında yeniden login gerekir.",
+            "example": "2026-07-02T12:35:00.000Z"
+          }
+        },
+        "required": [
+          "message",
+          "phone",
+          "expiresAt"
+        ]
+      },
+      "VerifyOtpDto": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "description": "Login adımında kullanılan telefon numarası.",
+            "example": "+905550000000"
+          },
+          "code": {
+            "type": "string",
+            "description": "SMS ile iletilen(!) 6 haneli tek kullanımlık kod. SMS simüle edildiği için varsayılan kod 123456'dır (OTP_DEFAULT_CODE ile değiştirilebilir).",
+            "example": "123456",
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": [
+          "phone",
+          "code"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "login/register/refresh çağrısından dönen geçerli refresh token.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "MessageResponseDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Çıkış yapıldı; aktif refresh oturumları iptal edildi."
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "UploadLicenseDto": {
+        "type": "object",
+        "properties": {
+          "front": {
+            "type": "string",
+            "format": "binary",
+            "description": "Ehliyetin ÖN yüz fotoğrafı (jpg/png, maks. 5MB)."
+          },
+          "back": {
+            "type": "string",
+            "format": "binary",
+            "description": "Ehliyetin ARKA yüz fotoğrafı (jpg/png, maks. 5MB)."
+          }
+        },
+        "required": [
+          "front",
+          "back"
+        ]
+      },
+      "LicenseResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0lic1234567890"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_SUBMITTED",
+              "UNDER_REVIEW",
+              "APPROVED",
+              "REJECTED"
+            ],
+            "example": "UNDER_REVIEW"
+          },
+          "frontImageUrl": {
+            "type": "string",
+            "example": "http://localhost:3000/uploads/licenses/front-123.jpg"
+          },
+          "backImageUrl": {
+            "type": "string",
+            "example": "http://localhost:3000/uploads/licenses/back-123.jpg"
+          },
+          "rejectReason": {
+            "type": "object",
+            "nullable": true,
+            "example": null
+          },
+          "reviewedAt": {
+            "type": "object",
+            "nullable": true,
+            "example": null
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-26T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-26T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "frontImageUrl",
+          "backImageUrl",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "LicenseStatusResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_SUBMITTED",
+              "UNDER_REVIEW",
+              "APPROVED",
+              "REJECTED"
+            ],
+            "example": "NOT_SUBMITTED",
+            "description": "NOT_SUBMITTED: hiç yükleme yok | UNDER_REVIEW: admin onayı bekliyor | APPROVED: onaylandı (rol CUSTOMER) | REJECTED: reddedildi (rejectReason dolu)"
+          },
+          "frontImageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "backImageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "rejectReason": {
+            "type": "object",
+            "nullable": true,
+            "example": "Fotoğraf bulanık, ehliyet numarası okunmuyor."
+          },
+          "reviewedAt": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "AdminLicenseResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0lic1234567890"
+          },
+          "userId": {
+            "type": "string",
+            "example": "clx0usr1234567890"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_SUBMITTED",
+              "UNDER_REVIEW",
+              "APPROVED",
+              "REJECTED"
+            ],
+            "example": "UNDER_REVIEW"
+          },
+          "frontImageUrl": {
+            "type": "string",
+            "example": "http://localhost:3000/uploads/licenses/front-123.jpg"
+          },
+          "backImageUrl": {
+            "type": "string",
+            "example": "http://localhost:3000/uploads/licenses/back-123.jpg"
+          },
+          "rejectReason": {
+            "type": "object",
+            "nullable": true
+          },
+          "reviewedAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-26T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-26T10:00:00.000Z"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserResponseDto"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "status",
+          "frontImageUrl",
+          "backImageUrl",
+          "createdAt",
+          "updatedAt",
+          "user"
+        ]
+      },
+      "RejectLicenseDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Reddetme gerekçesi (kullanıcıya gösterilir).",
+            "example": "Fotoğraf bulanık, ehliyet numarası okunmuyor.",
+            "minLength": 3,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CreateVehicleDto": {
+        "type": "object",
+        "properties": {
+          "plate": {
+            "type": "string",
+            "description": "Benzersiz plaka.",
+            "example": "34 ABC 123"
+          },
+          "brand": {
+            "type": "string",
+            "example": "Volkswagen"
+          },
+          "model": {
+            "type": "string",
+            "example": "Passat"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SEDAN",
+              "SUV",
+              "HATCHBACK",
+              "STATION",
+              "MINIVAN"
+            ],
+            "example": "SEDAN"
+          },
+          "pricePerDay": {
+            "type": "number",
+            "description": "Günlük kira ücreti (\u003E 0).",
+            "example": 1500
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Enlem (-90..90).",
+            "example": 41.0151
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Boylam (-180..180).",
+            "example": 28.9795
+          },
+          "status": {
+            "type": "string",
+            "description": "Başlangıç durumu. Verilmezse AVAILABLE. Aracı doğrudan bakımda oluşturmak için MAINTENANCE kullanılabilir.",
+            "enum": [
+              "AVAILABLE",
+              "RENTED",
+              "MAINTENANCE"
+            ],
+            "example": "AVAILABLE"
+          }
+        },
+        "required": [
+          "plate",
+          "brand",
+          "model",
+          "type",
+          "pricePerDay",
+          "latitude",
+          "longitude"
+        ]
+      },
+      "VehicleResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "plate": {
+            "type": "string",
+            "example": "34 ABC 123"
+          },
+          "brand": {
+            "type": "string",
+            "example": "Volkswagen"
+          },
+          "model": {
+            "type": "string",
+            "example": "Passat"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SEDAN",
+              "SUV",
+              "HATCHBACK",
+              "STATION",
+              "MINIVAN"
+            ],
+            "example": "SEDAN"
+          },
+          "pricePerDay": {
+            "type": "number",
+            "example": 1500
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "RENTED",
+              "MAINTENANCE"
+            ],
+            "example": "AVAILABLE"
+          },
+          "latitude": {
+            "type": "number",
+            "example": 41.0151
+          },
+          "longitude": {
+            "type": "number",
+            "example": 28.9795
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-30T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-30T10:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "plate",
+          "brand",
+          "model",
+          "type",
+          "pricePerDay",
+          "status",
+          "latitude",
+          "longitude",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateVehicleDto": {
+        "type": "object",
+        "properties": {
+          "plate": {
+            "type": "string",
+            "description": "Benzersiz plaka.",
+            "example": "34 ABC 123"
+          },
+          "brand": {
+            "type": "string",
+            "example": "Volkswagen"
+          },
+          "model": {
+            "type": "string",
+            "example": "Passat"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SEDAN",
+              "SUV",
+              "HATCHBACK",
+              "STATION",
+              "MINIVAN"
+            ],
+            "example": "SEDAN"
+          },
+          "pricePerDay": {
+            "type": "number",
+            "description": "Günlük kira ücreti (\u003E 0).",
+            "example": 1500
+          },
+          "latitude": {
+            "type": "number",
+            "description": "Enlem (-90..90).",
+            "example": 41.0151
+          },
+          "longitude": {
+            "type": "number",
+            "description": "Boylam (-180..180).",
+            "example": 28.9795
+          },
+          "status": {
+            "type": "string",
+            "description": "Başlangıç durumu. Verilmezse AVAILABLE. Aracı doğrudan bakımda oluşturmak için MAINTENANCE kullanılabilir.",
+            "enum": [
+              "AVAILABLE",
+              "RENTED",
+              "MAINTENANCE"
+            ],
+            "example": "AVAILABLE"
+          }
+        }
+      },
+      "CreateRentalDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "description": "Kiralanacak aracın id'si.",
+            "example": "clx0veh1234567890"
+          },
+          "endDate": {
+            "type": "string",
+            "description": "Planlanan iade tarihi. Şu andan ileri olmalı (gün hesabı buna göre).",
+            "example": "2026-07-05T10:00:00.000Z",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "vehicleId",
+          "endDate"
+        ]
+      },
+      "RentalResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0rent1234567890"
+          },
+          "userId": {
+            "type": "string",
+            "example": "clx0usr1234567890"
+          },
+          "vehicleId": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "startDate": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-30T12:00:00.000Z"
+          },
+          "endDate": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-05T10:00:00.000Z"
+          },
+          "totalPrice": {
+            "type": "number",
+            "description": "Oluştururken kilitlenen toplam ücret (gün * pricePerDay).",
+            "example": 7500
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "example": "ACTIVE"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-30T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "vehicleId",
+          "startDate",
+          "endDate",
+          "totalPrice",
+          "status",
+          "createdAt"
+        ]
+      },
+      "RentalUserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0usr1234567890"
+          },
+          "email": {
+            "type": "string",
+            "example": "customer@rencar.com"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Test Müşteri"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName"
+        ]
+      },
+      "RentalVehicleSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "plate": {
+            "type": "string",
+            "example": "34 ABC 123"
+          },
+          "brand": {
+            "type": "string",
+            "example": "Volkswagen"
+          },
+          "model": {
+            "type": "string",
+            "example": "Passat"
+          },
+          "status": {
+            "type": "string",
+            "example": "RENTED"
+          }
+        },
+        "required": [
+          "id",
+          "plate",
+          "brand",
+          "model",
+          "status"
+        ]
+      },
+      "AdminRentalResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0rent1234567890"
+          },
+          "startDate": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-30T12:00:00.000Z"
+          },
+          "endDate": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-05T10:00:00.000Z"
+          },
+          "totalPrice": {
+            "type": "number",
+            "example": 7500
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "example": "ACTIVE"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-06-30T12:00:00.000Z"
+          },
+          "user": {
+            "$ref": "#/components/schemas/RentalUserSummary"
+          },
+          "vehicle": {
+            "$ref": "#/components/schemas/RentalVehicleSummary"
+          }
+        },
+        "required": [
+          "id",
+          "startDate",
+          "endDate",
+          "totalPrice",
+          "status",
+          "createdAt",
+          "user",
+          "vehicle"
+        ]
+      },
+      "VehiclePositionDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "plate": {
+            "type": "string",
+            "example": "34 ABC 123"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "RENTED",
+              "MAINTENANCE"
+            ],
+            "example": "AVAILABLE"
+          },
+          "latitude": {
+            "type": "number",
+            "example": 41.0151
+          },
+          "longitude": {
+            "type": "number",
+            "example": 28.9795
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "Konumun en son güncellendiği an (ISO).",
+            "example": "2026-06-30T12:00:01.000Z"
+          }
+        },
+        "required": [
+          "vehicleId",
+          "plate",
+          "status",
+          "latitude",
+          "longitude",
+          "updatedAt"
+        ]
+      }
+    }
+  }
+}
