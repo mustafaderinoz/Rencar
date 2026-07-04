@@ -65,4 +65,81 @@ object RencarIcons {
             }
         }.build()
     }
+
+    /** Geri (‹) — üst-sol geri butonu. Tint çağrı yerinde verilir. */
+    val ChevronLeft: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarChevronLeft",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(15.41f, 7.41f)
+                lineTo(14f, 6f)
+                lineTo(8f, 12f)
+                lineTo(14f, 18f)
+                lineTo(15.41f, 16.59f)
+                lineTo(10.83f, 12f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Sohbet balonu — "Kod Gönder" butonu ikonu. */
+    val ChatBubble: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarChatBubble",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(20f, 2f)
+                horizontalLineTo(4f)
+                curveToRelative(-1.1f, 0f, -1.99f, 0.9f, -1.99f, 2f)
+                lineTo(2f, 22f)
+                lineToRelative(4f, -4f)
+                horizontalLineToRelative(14f)
+                curveToRelative(1.1f, 0f, 2f, -0.9f, 2f, -2f)
+                verticalLineTo(4f)
+                curveToRelative(0f, -1.1f, -0.9f, -2f, -2f, -2f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Bilgi (ⓘ) — telefon alanı altındaki açıklama satırı. */
+    val Info: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarInfo",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(12f, 2f)
+                curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
+                reflectiveCurveToRelative(4.48f, 10f, 10f, 10f)
+                reflectiveCurveToRelative(10f, -4.48f, 10f, -10f)
+                reflectiveCurveTo(17.52f, 2f, 12f, 2f)
+                close()
+                moveToRelative(1f, 15f)
+                horizontalLineToRelative(-2f)
+                verticalLineToRelative(-6f)
+                horizontalLineToRelative(2f)
+                verticalLineToRelative(6f)
+                close()
+                moveToRelative(0f, -8f)
+                horizontalLineToRelative(-2f)
+                verticalLineTo(7f)
+                horizontalLineToRelative(2f)
+                verticalLineToRelative(2f)
+                close()
+            }
+        }.build()
+    }
 }
