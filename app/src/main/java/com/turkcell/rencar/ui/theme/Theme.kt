@@ -145,7 +145,7 @@ fun RenCarTheme(
     CompositionLocalProvider(LocalRencarColors provides extended) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography,
+            typography = RencarTypography,
             content = content,
         )
     }
