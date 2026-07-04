@@ -32,6 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+// androidx.hilt 1.3.0: hiltViewModel() kanonik olarak bu pakette; navigation.compose'daki
+// kopya deprecated. Bağımlılık hilt-navigation-compose (decisions.md) buna transitively bağımlı.
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.turkcell.rencar.ui.icons.RencarIcons
