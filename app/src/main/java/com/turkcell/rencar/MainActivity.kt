@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.turkcell.rencar.ui.login.LoginScreen
+import com.turkcell.rencar.ui.otp.OtpVerificationScreen
 import com.turkcell.rencar.ui.theme.RenCarTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -17,7 +18,9 @@ class MainActivity : ComponentActivity() {
             RenCarTheme {
                 // Splash/Onboarding sonrası giriş ekranı. Gerçek splash→login
                 // navigasyon grafiği ayrı bir işte kurulacak (§4.6).
-                LoginScreen()
+                //LoginScreen()
+
+                OtpVerificationScreen()
             }
         }
     }

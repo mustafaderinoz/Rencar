@@ -23,7 +23,6 @@ object RencarIcons {
             viewportHeight = 24f,
         ).apply {
             path(fill = SolidColor(Color.White)) {
-                // Gövde
                 moveTo(18.92f, 6.01f)
                 curveTo(18.72f, 5.42f, 18.16f, 5f, 17.5f, 5f)
                 horizontalLineToRelative(-11f)
@@ -42,21 +41,18 @@ object RencarIcons {
                 verticalLineToRelative(-8f)
                 lineToRelative(-2.08f, -5.99f)
                 close()
-                // Sol teker
                 moveTo(6.5f, 16f)
                 curveToRelative(-0.83f, 0f, -1.5f, -0.67f, -1.5f, -1.5f)
                 reflectiveCurveTo(5.67f, 13f, 6.5f, 13f)
                 reflectiveCurveToRelative(1.5f, 0.67f, 1.5f, 1.5f)
                 reflectiveCurveTo(7.33f, 16f, 6.5f, 16f)
                 close()
-                // Sağ teker
                 moveTo(17.5f, 16f)
                 curveToRelative(-0.83f, 0f, -1.5f, -0.67f, -1.5f, -1.5f)
                 reflectiveCurveToRelative(0.67f, -1.5f, 1.5f, -1.5f)
                 reflectiveCurveToRelative(1.5f, 0.67f, 1.5f, 1.5f)
                 reflectiveCurveToRelative(-0.67f, 1.5f, -1.5f, 1.5f)
                 close()
-                // Kabin / ön cam
                 moveTo(5f, 11f)
                 lineToRelative(1.5f, -4.5f)
                 horizontalLineToRelative(11f)
@@ -138,6 +134,71 @@ object RencarIcons {
                 verticalLineTo(7f)
                 horizontalLineToRelative(2f)
                 verticalLineToRelative(2f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Telefon/cihaz silueti — OTP ekranı üst ikonu. */
+    val Phone: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarPhone",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(17f, 1f)
+                horizontalLineTo(7f)
+                curveToRelative(-1.1f, 0f, -2f, 0.9f, -2f, 2f)
+                verticalLineToRelative(18f)
+                curveToRelative(0f, 1.1f, 0.9f, 2f, 2f, 2f)
+                horizontalLineToRelative(10f)
+                curveToRelative(1.1f, 0f, 2f, -0.9f, 2f, -2f)
+                verticalLineTo(3f)
+                curveToRelative(0f, -1.1f, -0.9f, -2f, -2f, -2f)
+                close()
+                moveToRelative(0f, 18f)
+                horizontalLineTo(7f)
+                verticalLineTo(5f)
+                horizontalLineToRelative(10f)
+                verticalLineToRelative(14f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Saat (yeniden gönderme sayacı) — OTP ekranı zamanlayıcı satırı. */
+    val Clock: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarClock",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                // Dış çember
+                moveTo(12f, 2f)
+                curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
+                reflectiveCurveToRelative(4.48f, 10f, 10f, 10f)
+                reflectiveCurveToRelative(10f, -4.48f, 10f, -10f)
+                reflectiveCurveTo(17.52f, 2f, 12f, 2f)
+                close()
+                moveToRelative(0f, 18f)
+                curveToRelative(-4.41f, 0f, -8f, -3.59f, -8f, -8f)
+                reflectiveCurveToRelative(3.59f, -8f, 8f, -8f)
+                reflectiveCurveToRelative(8f, 3.59f, 8f, 8f)
+                reflectiveCurveToRelative(-3.59f, 8f, -8f, 8f)
+                close()
+                // Akrep + yelkovan
+                moveTo(12.5f, 7f)
+                horizontalLineToRelative(-1.5f)
+                verticalLineToRelative(6f)
+                lineToRelative(5.25f, 3.15f)
+                lineToRelative(0.75f, -1.23f)
+                lineToRelative(-4.5f, -2.67f)
                 close()
             }
         }.build()
