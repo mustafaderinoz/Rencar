@@ -56,12 +56,21 @@ private val RencarBlue = LightPrimary
 // ── Stateful sarmalayıcı (§4.5) ──
 @Composable
 fun LoginScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToOtp: (String) -> Unit,
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     LoginScreen(
         uiState = uiState,
-        onIntent = viewModel::onIntent,
+        onIntent = { intent ->
+            when (intent) {
+                LoginIntent.BackClicked -> onNavigateBack()
+                LoginIntent.SendCodeClicked -> onNavigateToOtp(uiState.phone)
+                // RegisterClicked: kayıt ekranı henüz yok (§2.2) — VM'de no-op olarak kalır.
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 

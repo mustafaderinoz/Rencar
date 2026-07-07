@@ -50,12 +50,19 @@ private val RencarBlue = LightPrimary
 // ── Stateful sarmalayıcı (§4.5) ──
 @Composable
 fun OnboardingScreen(
+    onNavigateToLogin: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     OnboardingScreen(
         uiState = uiState,
-        onIntent = viewModel::onIntent,
+        onIntent = { intent ->
+            when (intent) {
+                // "Hemen Başla" ve "Giriş yap" mevcut tek giriş ekranına (Login) yönlendirir.
+                OnboardingIntent.StartClicked, OnboardingIntent.LoginClicked -> onNavigateToLogin()
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 

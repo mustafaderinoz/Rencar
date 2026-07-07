@@ -63,12 +63,19 @@ private val RencarBlue = LightPrimary
 // ── Stateful sarmalayıcı (§4.5) ──
 @Composable
 fun OtpVerificationScreen(
+    onNavigateBack: () -> Unit,
     viewModel: OtpVerificationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     OtpVerificationScreen(
         uiState = uiState,
-        onIntent = viewModel::onIntent,
+        onIntent = { intent ->
+            when (intent) {
+                OtpVerificationIntent.BackClicked -> onNavigateBack()
+                // VerifyClicked: ana ekran (home) henüz yok (§2.2) — VM'de no-op olarak kalır.
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 
