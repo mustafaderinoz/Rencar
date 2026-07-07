@@ -24,4 +24,13 @@ object RencarDestinations {
 
     /** Belirli bir numara için somut OTP rotasını üretir ([Uri.encode] ile güvenli kodlama). */
     fun otpRoute(phone: String): String = "$OTP/${Uri.encode(phone)}"
+
+    /** 04 Home — alt navigasyonlu (Harita/Geçmiş/Cüzdan/Profil) ana kabuk. */
+    const val HOME = "home"
+
+    // Home içindeki nested NavHost sekme rotaları (MainScreen). İçerikler şimdilik placeholder.
+    const val MAP = "map"
+    const val HISTORY = "history"
+    const val WALLET = "wallet"
+    const val PROFILE = "profile"
 }

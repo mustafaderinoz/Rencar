@@ -12,6 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.turkcell.rencar.ui.login.LoginScreen
+import com.turkcell.rencar.ui.home.HomeScreen
 import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
 
@@ -59,7 +60,18 @@ fun RencarNavHost(
         ) {
             OtpVerificationScreen(
                 onNavigateBack = { navController.popBackStack() },
+                // Doğrulama başarılı → alt navigasyonlu ana kabuk. OTP öncesi akış (onboarding→login→otp)
+                // geri yığından temizlenir ki "geri" ile giriş akışına dönülmesin.
+                onNavigateToHome = {
+                    navController.navigate(RencarDestinations.HOME) {
+                        popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
+                    }
+                },
             )
+        }
+        // Home: Harita/Geçmiş/Cüzdan/Profil sekmelerini barındıran alt navigasyonlu kabuk.
+        composable(RencarDestinations.HOME) {
+            HomeScreen()
         }
     }
 }

@@ -64,6 +64,7 @@ private val RencarBlue = LightPrimary
 @Composable
 fun OtpVerificationScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToHome: () -> Unit,
     viewModel: OtpVerificationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -72,7 +73,9 @@ fun OtpVerificationScreen(
         onIntent = { intent ->
             when (intent) {
                 OtpVerificationIntent.BackClicked -> onNavigateBack()
-                // VerifyClicked: ana ekran (home) henüz yok (§2.2) — VM'de no-op olarak kalır.
+                // Doğrulama → alt navigasyonlu ana ekran (Home). İş kuralı/başarı doğrulaması
+                // henüz yok (§2.2); iskelet için tıklama doğrudan Home'a yönlendirir.
+                OtpVerificationIntent.VerifyClicked -> onNavigateToHome()
                 else -> viewModel.onIntent(intent)
             }
         },
