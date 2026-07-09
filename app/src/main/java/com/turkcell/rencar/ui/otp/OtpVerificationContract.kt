@@ -8,7 +8,11 @@ package com.turkcell.rencar.ui.otp
 data class OtpVerificationUiState(
     val phoneNumber: String = "",
     val otpCode: String = "",
-    val timeRemaining: Int = 42, // Saniye cinsinden
+    val timeRemaining: Int = 299, // Saniye cinsinden (4:59 — OTP 5 dk geçerli)
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    /** POST /auth/verify-otp başarılı → Home'a geçiş sinyali (§4.6: Effect yerine state bayrağı). */
+    val verified: Boolean = false,
 )
 
 /**

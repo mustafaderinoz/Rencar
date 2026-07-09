@@ -19,12 +19,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,12 +63,21 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // POST /auth/login başarılı → OTP ekranına geç ve bayrağı tüket (tekrar geçişi önler).
+    LaunchedEffect(uiState.codeSent) {
+        if (uiState.codeSent) {
+            onNavigateToOtp(uiState.phone)
+            viewModel.onCodeSentHandled()
+        }
+    }
+
     LoginScreen(
         uiState = uiState,
         onIntent = { intent ->
             when (intent) {
                 LoginIntent.BackClicked -> onNavigateBack()
-                LoginIntent.SendCodeClicked -> onNavigateToOtp(uiState.phone)
+                // SendCodeClicked artık VM'e gider (API çağrısı); geçiş codeSent ile tetiklenir.
                 // RegisterClicked: kayıt ekranı henüz yok (§2.2) — VM'de no-op olarak kalır.
                 else -> viewModel.onIntent(intent)
             }
@@ -177,6 +188,7 @@ private fun LoginScreen(
             // ── "Kod Gönder" — mavi buton + yumuşak mavi ışıma ──
             Button(
                 onClick = { onIntent(LoginIntent.SendCodeClicked) },
+                enabled = uiState.phone.length == 10 && !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
@@ -193,16 +205,34 @@ private fun LoginScreen(
                     contentColor = Color.White,
                 ),
             ) {
-                Icon(
-                    imageVector = RencarIcons.ChatBubble,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp),
+                    )
+                } else {
+                    Icon(
+                        imageVector = RencarIcons.ChatBubble,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Kod Gönder",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+
+            // ── Hata mesajı (POST /auth/login başarısız) ──
+            if (uiState.errorMessage != null) {
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Kod Gönder",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = uiState.errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
 

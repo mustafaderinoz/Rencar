@@ -7,6 +7,10 @@ package com.turkcell.rencar.ui.login
  */
 data class LoginUiState(
     val phone: String = "",
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null,
+    /** POST /auth/login başarılı → OTP ekranına geçiş sinyali (§4.6: Effect yerine state bayrağı). */
+    val codeSent: Boolean = false,
 )
 
 /**

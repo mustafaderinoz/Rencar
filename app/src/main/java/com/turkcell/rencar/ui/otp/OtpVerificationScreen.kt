@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -68,14 +69,21 @@ fun OtpVerificationScreen(
     viewModel: OtpVerificationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // POST /auth/verify-otp başarılı → Home'a geç ve bayrağı tüket (tekrar geçişi önler).
+    LaunchedEffect(uiState.verified) {
+        if (uiState.verified) {
+            onNavigateToHome()
+            viewModel.onVerifiedHandled()
+        }
+    }
+
     OtpVerificationScreen(
         uiState = uiState,
         onIntent = { intent ->
             when (intent) {
                 OtpVerificationIntent.BackClicked -> onNavigateBack()
-                // Doğrulama → alt navigasyonlu ana ekran (Home). İş kuralı/başarı doğrulaması
-                // henüz yok (§2.2); iskelet için tıklama doğrudan Home'a yönlendirir.
-                OtpVerificationIntent.VerifyClicked -> onNavigateToHome()
+                // VerifyClicked artık VM'e gider (API çağrısı); geçiş verified ile tetiklenir.
                 else -> viewModel.onIntent(intent)
             }
         },
@@ -184,7 +192,7 @@ private fun OtpVerificationScreen(
                     ) { onIntent(OtpVerificationIntent.ResendCodeClicked) },
                 )
                 Text(
-                    text = " · 0:${String.format("%02d", uiState.timeRemaining)}",
+                    text = " · ${uiState.timeRemaining / 60}:${String.format("%02d", uiState.timeRemaining % 60)}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -192,9 +200,22 @@ private fun OtpVerificationScreen(
 
             Spacer(Modifier.weight(1f))
 
+            // ── Hata mesajı (POST /auth/verify-otp başarısız) ──
+            if (uiState.errorMessage != null) {
+                Text(
+                    text = uiState.errorMessage,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
             // ── "Doğrula ve Devam Et" — mavi buton ──
             Button(
                 onClick = { onIntent(OtpVerificationIntent.VerifyClicked) },
+                enabled = uiState.otpCode.length == 6 && !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
@@ -211,10 +232,18 @@ private fun OtpVerificationScreen(
                     contentColor = Color.White,
                 ),
             ) {
-                Text(
-                    text = "Doğrula ve Devam Et",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp),
+                    )
+                } else {
+                    Text(
+                        text = "Doğrula ve Devam Et",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
             }
 
             Spacer(Modifier.height(14.dp))
@@ -371,7 +400,7 @@ private fun OtpVerificationScreenLightPreview() {
             uiState = OtpVerificationUiState(
                 phoneNumber = "+90 532 000 00 00",
                 otpCode = "482",
-                timeRemaining = 42,
+                timeRemaining = 299,
             ),
             onIntent = {},
         )
@@ -386,7 +415,7 @@ private fun OtpVerificationScreenDarkPreview() {
             uiState = OtpVerificationUiState(
                 phoneNumber = "+90 532 000 00 00",
                 otpCode = "482",
-                timeRemaining = 42,
+                timeRemaining = 299,
             ),
             onIntent = {},
         )
