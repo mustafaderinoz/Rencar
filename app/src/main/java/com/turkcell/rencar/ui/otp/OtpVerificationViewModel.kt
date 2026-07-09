@@ -81,8 +81,16 @@ class OtpVerificationViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
             authRepository.verifyOtp(phone = e164Phone, code = state.otpCode)
-                .onSuccess {
-                    _uiState.update { it.copy(isLoading = false, verified = true) }
+                .onSuccess { auth ->
+                    // PENDING kullanıcı ehliyet doğrulamaya, onaylı roller doğrudan Home'a gider.
+                    val needsLicense = auth.user.role == "PENDING"
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            verified = true,
+                            needsLicenseVerification = needsLicense,
+                        )
+                    }
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }

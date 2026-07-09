@@ -95,3 +95,34 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - Son Güncelleme Tarihi: 09.07.2026
 
 - Sebep: Endpoint'ler KÖK dizinde yayınlanıyor; `/api` prefix'i YOKTUR. Yalnızca Swagger UI `/api/docs` altındadır. curl ile doğrulandı: `/health` ve `/auth/login` → 200; `/api/health` ve `/api/auth/login` → 404. (İlk varsayım `/api/` prefix'iydi; 404 hatası üzerine düzeltildi.)
+
+
+### Kamera & Yüz Algılama (Ehliyet + Selfie doğrulama)
+
+- Seçim: **CameraX (1.4.2) + ML Kit Face Detection (16.1.7, bundled)**
+
+- Son Güncelleme Tarihi: 09.07.2026
+
+- Alternatifler: **Camera2 API (düşük seviye)**, **ML Kit unbundled (Play Services)**
+
+- Sebep: Selfie ekranında canlı önizleme + gerçek zamanlı yüz ortalama; CameraX lifecycle-bağlı ve Compose (`PreviewView` + `AndroidView`) ile temiz. ML Kit bundled model offline çalışır (Play Services'e bağımlı değil). Selfie yalnızca client-side liveness kapısıdır; backend'e GÖNDERİLMEZ (`UploadLicenseDto` yalnız front+back alır).
+
+
+### Ehliyet Görsel Kaynağı
+
+- Seçim: **Harici kamera çekimi** (`ActivityResultContracts.TakePicture` + `FileProvider`)
+
+- Son Güncelleme Tarihi: 09.07.2026
+
+- Alternatifler: **Galeriden seçim (PhotoPicker)**, **CameraX ile uygulama içi çekim**
+
+- Sebep: Ehliyet ön/arka yüz belge fotoğrafı; harici kamera basit ve yeni bağımlılık gerektirmez. Çekilen dosyalar `filesDir/licenses/` altında tutulur, FileProvider ile paylaşılır. Galeri yükleme bu iş kapsamında değil.
+
+
+### Görsel Yükleme & Sıkıştırma (License Upload)
+
+- Seçim: **Multipart (Retrofit `@Multipart`) + yüklemeden önce JPEG downscale/compress** (`data/util/ImageCompressor`)
+
+- Son Güncelleme Tarihi: 09.07.2026
+
+- Sebep: `POST /license/upload` dosya başına maks. 5MB; kamera tam çözünürlük bunu aşabilir. Yüklemeden önce ~1600px'e küçültülüp q80 sıkıştırılır. Auth token'ı mevcut `AuthInterceptor` üzerinden eklenir.

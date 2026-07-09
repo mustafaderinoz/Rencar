@@ -66,14 +66,15 @@ private val RencarBlue = LightPrimary
 fun OtpVerificationScreen(
     onNavigateBack: () -> Unit,
     onNavigateToHome: () -> Unit,
+    onNavigateToLicense: () -> Unit,
     viewModel: OtpVerificationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // POST /auth/verify-otp başarılı → Home'a geç ve bayrağı tüket (tekrar geçişi önler).
+    // POST /auth/verify-otp başarılı → PENDING ise ehliyet akışı, değilse Home; bayrağı tüket.
     LaunchedEffect(uiState.verified) {
         if (uiState.verified) {
-            onNavigateToHome()
+            if (uiState.needsLicenseVerification) onNavigateToLicense() else onNavigateToHome()
             viewModel.onVerifiedHandled()
         }
     }

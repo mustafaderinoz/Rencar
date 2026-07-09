@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    FileProvider yolları. Ehliyet çekimleri uygulamaya özel iç depoda
+    (filesDir/licenses/) tutulur; harici kamera uygulamasına bu alt yol için
+    geçici yazma izni verilir (grantUriPermissions).
+-->
+<paths>
+    <files-path
+        name="licenses"
+        path="licenses/" />
+</paths>

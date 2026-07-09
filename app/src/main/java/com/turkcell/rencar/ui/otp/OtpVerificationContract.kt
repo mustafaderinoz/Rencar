@@ -11,8 +11,10 @@ data class OtpVerificationUiState(
     val timeRemaining: Int = 299, // Saniye cinsinden (4:59 — OTP 5 dk geçerli)
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    /** POST /auth/verify-otp başarılı → Home'a geçiş sinyali (§4.6: Effect yerine state bayrağı). */
+    /** POST /auth/verify-otp başarılı → geçiş sinyali (§4.6: Effect yerine state bayrağı). */
     val verified: Boolean = false,
+    /** Kullanıcı PENDING ise ehliyet doğrulama akışına, değilse Home'a yönlendirilir. */
+    val needsLicenseVerification: Boolean = false,
 )
 
 /**

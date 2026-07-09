@@ -310,6 +310,88 @@ object RencarIcons {
         }.build()
     }
 
+    /** Fotoğraf makinesi — ehliyet "çek veya yükle" kartları. */
+    val Camera: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarCamera",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(9f, 2f)
+                lineTo(7.17f, 4f)
+                horizontalLineTo(4f)
+                curveToRelative(-1.1f, 0f, -2f, 0.9f, -2f, 2f)
+                verticalLineToRelative(12f)
+                curveToRelative(0f, 1.1f, 0.9f, 2f, 2f, 2f)
+                horizontalLineToRelative(16f)
+                curveToRelative(1.1f, 0f, 2f, -0.9f, 2f, -2f)
+                verticalLineTo(6f)
+                curveToRelative(0f, -1.1f, -0.9f, -2f, -2f, -2f)
+                horizontalLineToRelative(-3.17f)
+                lineTo(15f, 2f)
+                horizontalLineTo(9f)
+                close()
+                moveTo(12f, 17f)
+                curveToRelative(-2.76f, 0f, -5f, -2.24f, -5f, -5f)
+                reflectiveCurveToRelative(2.24f, -5f, 5f, -5f)
+                reflectiveCurveToRelative(5f, 2.24f, 5f, 5f)
+                reflectiveCurveToRelative(-2.24f, 5f, -5f, 5f)
+                close()
+                moveTo(12f, 15.2f)
+                curveToRelative(1.77f, 0f, 3.2f, -1.43f, 3.2f, -3.2f)
+                reflectiveCurveToRelative(-1.43f, -3.2f, -3.2f, -3.2f)
+                reflectiveCurveToRelative(-3.2f, 1.43f, -3.2f, 3.2f)
+                reflectiveCurveToRelative(1.43f, 3.2f, 3.2f, 3.2f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Onay tiki — "Yüklendi" rozeti ve başarı durumu. */
+    val Check: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarCheck",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(9f, 16.17f)
+                lineTo(4.83f, 12f)
+                lineToRelative(-1.42f, 1.41f)
+                lineTo(9f, 19f)
+                lineTo(21f, 7f)
+                lineToRelative(-1.41f, -1.41f)
+                close()
+            }
+        }.build()
+    }
+
+    /** İleri (›) — devam/ilerleme yön ikonu. */
+    val ChevronRight: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarChevronRight",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(10f, 6f)
+                lineTo(8.59f, 7.41f)
+                lineTo(13.17f, 12f)
+                lineToRelative(-4.58f, 4.59f)
+                lineTo(10f, 18f)
+                lineToRelative(6f, -6f)
+                close()
+            }
+        }.build()
+    }
+
     /** Kişi silueti — alt navigasyon "Profil" sekmesi. */
     val Person: ImageVector by lazy {
         ImageVector.Builder(

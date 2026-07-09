@@ -13,8 +13,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.turkcell.rencar.ui.login.LoginScreen
 import com.turkcell.rencar.ui.home.HomeScreen
+import com.turkcell.rencar.ui.license.LicenseScreen
 import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
+import com.turkcell.rencar.ui.selfie.SelfieScreen
 
 /**
  * Uygulamanın navigasyon grafiği (decisions.md: Compose Navigation).
@@ -60,11 +62,43 @@ fun RencarNavHost(
         ) {
             OtpVerificationScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // Doğrulama başarılı → alt navigasyonlu ana kabuk. OTP öncesi akış (onboarding→login→otp)
-                // geri yığından temizlenir ki "geri" ile giriş akışına dönülmesin.
+                // PENDING kullanıcı → ehliyet doğrulama akışı; onaylı (CUSTOMER/ADMIN) → Home.
+                // Her iki durumda da OTP öncesi akış (onboarding→login→otp) geri yığından temizlenir.
+                onNavigateToLicense = {
+                    navController.navigate(RencarDestinations.LICENSE) {
+                        popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
+                    }
+                },
                 onNavigateToHome = {
                     navController.navigate(RencarDestinations.HOME) {
                         popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
+                    }
+                },
+            )
+        }
+        // Ehliyet doğrulama (1. adım): ön+arka çekilir, selfie ekranına yollar iletilir.
+        composable(RencarDestinations.LICENSE) {
+            LicenseScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSelfie = { front, back ->
+                    navController.navigate(RencarDestinations.selfieRoute(front, back))
+                },
+            )
+        }
+        // Selfie doğrulama (2. adım): ön/arka yollarını path argümanı taşır (SelfieViewModel okur).
+        composable(
+            route = RencarDestinations.SELFIE_ROUTE,
+            arguments = listOf(
+                navArgument(RencarDestinations.SELFIE_ARG_FRONT) { type = NavType.StringType },
+                navArgument(RencarDestinations.SELFIE_ARG_BACK) { type = NavType.StringType },
+            ),
+        ) {
+            SelfieScreen(
+                onNavigateBack = { navController.popBackStack() },
+                // Yükleme başarılı → Home. Ehliyet+selfie geri yığından temizlenir.
+                onNavigateToHome = {
+                    navController.navigate(RencarDestinations.HOME) {
+                        popUpTo(RencarDestinations.LICENSE) { inclusive = true }
                     }
                 },
             )
