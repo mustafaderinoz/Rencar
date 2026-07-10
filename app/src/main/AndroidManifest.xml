@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Harita ekranında kullanıcının anlık konumunu göstermek için (biri yeterli). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Selfie canlı önizlemesi (CameraX) ve ehliyet çekimi için kamera. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature

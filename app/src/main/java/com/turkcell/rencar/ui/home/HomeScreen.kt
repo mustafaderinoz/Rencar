@@ -17,6 +17,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.turkcell.rencar.ui.map.MapScreen
 import com.turkcell.rencar.ui.navigation.RencarDestinations
 import com.turkcell.rencar.ui.theme.RenCarTheme
 
@@ -61,7 +62,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            composable(RencarDestinations.MAP) { PlaceholderScreen("Harita") }
+            composable(RencarDestinations.MAP) { MapScreen() }
             composable(RencarDestinations.HISTORY) { PlaceholderScreen("Geçmiş") }
             composable(RencarDestinations.WALLET) { PlaceholderScreen("Cüzdan") }
             composable(RencarDestinations.PROFILE) { PlaceholderScreen("Profil") }
