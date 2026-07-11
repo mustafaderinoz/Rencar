@@ -1,5 +1,6 @@
 package com.turkcell.rencar.ui.map
 
+import android.content.Context
 import android.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -29,10 +30,14 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CircleLayer
+import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
+import com.turkcell.rencar.data.remote.dto.VehicleResponse
 
 /** Ege / İzmir civarı varsayılan kamera merkezi (konum gelene kadar gösterilir). */
 val DEFAULT_CENTER: LatLng = LatLng(38.51740367746754, 27.161930350129918)
@@ -90,6 +95,7 @@ fun RencarMap(
     initialCenter: LatLng = DEFAULT_CENTER,
     initialZoom: Double = DEFAULT_ZOOM,
     controller: RencarMapController? = null,
+    vehicles: List<VehicleResponse> = emptyList(),
 ) {
     // @Preview: MapLibre native motoru render edilemez → basit placeholder.
     if (LocalInspectionMode.current) {
@@ -165,6 +171,17 @@ fun RencarMap(
                         PropertyFactory.circleStrokeWidth(3f),
                     ),
                 )
+
+                // Araç fiyat balonları -> her feature'ın "icon" özelliği ilgili bitmap'i seçer.
+                loaded.addSource(GeoJsonSource("vehicles"))
+                loaded.addLayer(
+                    SymbolLayer("vehicles-layer", "vehicles").withProperties(
+                        PropertyFactory.iconImage("{icon}"),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
+                    ),
+                )
                 mapAndStyle = map to loaded
             }
         }
@@ -174,6 +191,13 @@ fun RencarMap(
     LaunchedEffect(mapAndStyle, myLocation) {
         val (_, style) = mapAndStyle ?: return@LaunchedEffect
         updateMe(style, myLocation)
+    }
+
+    // Araç balonları -> vehicles listesi her değiştiğinde bitmap'ler eklenir/temizlenir.
+    val addedIconIds = remember { mutableSetOf<String>() }
+    LaunchedEffect(mapAndStyle, vehicles) {
+        val (_, style) = mapAndStyle ?: return@LaunchedEffect
+        updateVehicles(context, style, vehicles, addedIconIds)
     }
 
     // AndroidView -> Android View ↔ @Composable köprüsü.
@@ -188,4 +212,41 @@ private fun updateMe(style: Style, myLocation: LatLng?) {
     } else {
         source.setGeoJson(Point.fromLngLat(myLocation.longitude, myLocation.latitude))
     }
+}
+
+/**
+ * "vehicles" kaynağını araç listesine göre günceller. Her araç için fiyat balonu bitmap'i
+ * stile bir kez eklenir ("veh-<id>"); listeden düşen araçların ikonları temizlenir.
+ * Her feature, kendi ikonunu seçmesi için "icon" string özelliğini taşır.
+ */
+private fun updateVehicles(
+    context: Context,
+    style: Style,
+    vehicles: List<VehicleResponse>,
+    addedIconIds: MutableSet<String>,
+) {
+    val source = style.getSourceAs<GeoJsonSource>("vehicles") ?: return
+
+    val currentIds = vehicles.mapTo(mutableSetOf()) { "veh-${it.id}" }
+    // Artık listede olmayan araçların ikonlarını stilden kaldır.
+    val stale = addedIconIds - currentIds
+    stale.forEach { style.removeImage(it) }
+    addedIconIds.removeAll(stale)
+
+    val features = vehicles.map { vehicle ->
+        val iconId = "veh-${vehicle.id}"
+        if (addedIconIds.add(iconId)) {
+            val bitmap = VehicleMarkers.build(
+                context = context,
+                priceText = VehicleMarkers.priceLabel(vehicle.pricePerDay),
+                backgroundColor = VehicleMarkers.colorForType(vehicle.type),
+            )
+            style.addImage(iconId, bitmap)
+        }
+        Feature.fromGeometry(
+            Point.fromLngLat(vehicle.longitude, vehicle.latitude),
+        ).apply { addStringProperty("icon", iconId) }
+    }
+
+    source.setGeoJson(FeatureCollection.fromFeatures(features))
 }

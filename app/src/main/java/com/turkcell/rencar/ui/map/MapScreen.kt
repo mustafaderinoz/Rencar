@@ -73,6 +73,11 @@ fun MapScreen(
         }
     }
 
+    // İlk açılış: müsait araçları API'den yükle (konum iznine bağlı değildir).
+    LaunchedEffect(Unit) {
+        viewModel.onIntent(MapIntent.LoadVehicles)
+    }
+
     // İzin verildiğinde konum güncellemelerini dinle; izin/ekran değişince temizle.
     DisposableEffect(uiState.hasLocationPermission) {
         if (!uiState.hasLocationPermission) return@DisposableEffect onDispose { }
@@ -134,6 +139,7 @@ private fun MapScreen(
             myLocation = uiState.myLocation,
             modifier = Modifier.fillMaxSize(),
             controller = controller,
+            vehicles = uiState.vehicles,
         )
 
         // Sağ alt -> konumu yeniden al ve kamerayı tekrar zoomla.

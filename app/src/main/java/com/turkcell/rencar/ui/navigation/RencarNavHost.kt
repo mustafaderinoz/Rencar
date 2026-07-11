@@ -33,7 +33,7 @@ fun RencarNavHost(
         navController = navController,
         // GEÇİCİ: harita geliştirmesi için başlangıç doğrudan Home'a. Kalıcı akış ONBOARDING'dir;
         // geri almak için aşağıdaki satırı RencarDestinations.ONBOARDING yap.
-        startDestination = RencarDestinations.HOME,
+        startDestination = RencarDestinations.ONBOARDING,
         // Geçiş (fade) sırasında ekranlar yarı saydamken aralarından kök/pencere arka planı
         // görünüp parlak bir "patlama"ya yol açıyordu; surface zemini bu sızıntıyı kapatır.
         modifier = modifier
