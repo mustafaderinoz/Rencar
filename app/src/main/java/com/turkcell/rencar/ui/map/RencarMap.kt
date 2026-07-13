@@ -151,8 +151,12 @@ fun RencarMap(
         mapView.getMapAsync { map ->
             controller?.map = map
 
+            // Sekme değişiminde (Profil↔Harita) bu composable atılıp yeniden yaratıldığında
+            // MapView sıfırlanır; ama MapViewModel korunduğundan kullanıcı konumu hâlâ elimizdedir.
+            // Kamerayı bilinen son konuma aç (yoksa default merkez) — aksi halde harita default
+            // merkeze döner ve araçlar ekran dışında kalıp "kaybolmuş" gibi görünür.
             map.cameraPosition = CameraPosition.Builder()
-                .target(initialCenter)
+                .target(myLocation ?: initialCenter)
                 .zoom(initialZoom)
                 .build()
 

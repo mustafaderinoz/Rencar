@@ -5,6 +5,7 @@ import com.turkcell.rencar.data.remote.api.AuthApi
 import com.turkcell.rencar.data.remote.dto.AuthResponse
 import com.turkcell.rencar.data.remote.dto.LoginRequest
 import com.turkcell.rencar.data.remote.dto.OtpRequiredResponse
+import com.turkcell.rencar.data.remote.dto.UserDto
 import com.turkcell.rencar.data.remote.dto.VerifyOtpRequest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,5 +30,10 @@ class AuthRepository @Inject constructor(
         authApi.verifyOtp(VerifyOtpRequest(phone = phone, code = code)).also { auth ->
             tokenStore.saveTokens(auth.accessToken, auth.refreshToken)
         }
+    }
+
+    /** Geçerli token sahibinin profili (GET /auth/me). Profil ekranı ad/telefon/rol için okur. */
+    suspend fun me(): Result<UserDto> = runCatching {
+        authApi.me()
     }
 }

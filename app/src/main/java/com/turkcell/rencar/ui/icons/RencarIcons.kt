@@ -627,4 +627,242 @@ object RencarIcons {
             }
         }.build()
     }
+
+    /** Kalem — profil başlığındaki "düzenle" butonu. */
+    val Edit: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarEdit",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(3f, 17.25f)
+                verticalLineTo(21f)
+                horizontalLineToRelative(3.75f)
+                lineTo(17.81f, 9.94f)
+                lineToRelative(-3.75f, -3.75f)
+                lineTo(3f, 17.25f)
+                close()
+                moveTo(20.71f, 7.04f)
+                curveToRelative(0.39f, -0.39f, 0.39f, -1.02f, 0f, -1.41f)
+                lineToRelative(-2.34f, -2.34f)
+                curveToRelative(-0.39f, -0.39f, -1.02f, -0.39f, -1.41f, 0f)
+                lineToRelative(-1.83f, 1.83f)
+                lineToRelative(3.75f, 3.75f)
+                lineToRelative(1.83f, -1.83f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Onaylı kalkan (verified_user) — ehliyet doğrulama durumu ikonu. */
+    val Shield: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarShield",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(12f, 1f)
+                lineTo(3f, 5f)
+                verticalLineToRelative(6f)
+                curveToRelative(0f, 5.55f, 3.84f, 10.74f, 9f, 12f)
+                curveToRelative(5.16f, -1.26f, 9f, -6.45f, 9f, -12f)
+                verticalLineTo(5f)
+                lineToRelative(-9f, -4f)
+                close()
+                moveToRelative(-2f, 16f)
+                lineToRelative(-4f, -4f)
+                lineToRelative(1.41f, -1.41f)
+                lineTo(10f, 14.17f)
+                lineToRelative(6.59f, -6.58f)
+                lineTo(18f, 10f)
+                lineToRelative(-8f, 7f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Kredi kartı — profil "Ödeme yöntemleri" satırı. */
+    val CreditCard: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarCreditCard",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(20f, 4f)
+                horizontalLineTo(4f)
+                curveToRelative(-1.11f, 0f, -1.99f, 0.89f, -1.99f, 2f)
+                lineTo(2f, 18f)
+                curveToRelative(0f, 1.11f, 0.89f, 2f, 2f, 2f)
+                horizontalLineToRelative(16f)
+                curveToRelative(1.11f, 0f, 2f, -0.89f, 2f, -2f)
+                verticalLineTo(6f)
+                curveToRelative(0f, -1.11f, -0.89f, -2f, -2f, -2f)
+                close()
+                moveToRelative(0f, 14f)
+                horizontalLineTo(4f)
+                verticalLineToRelative(-6f)
+                horizontalLineToRelative(16f)
+                verticalLineToRelative(6f)
+                close()
+                moveToRelative(0f, -10f)
+                horizontalLineTo(4f)
+                verticalLineTo(6f)
+                horizontalLineToRelative(16f)
+                verticalLineToRelative(2f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Soru işareti (help) — profil "Yardım & destek" satırı. */
+    val Help: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarHelp",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(12f, 2f)
+                curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
+                reflectiveCurveToRelative(4.48f, 10f, 10f, 10f)
+                reflectiveCurveToRelative(10f, -4.48f, 10f, -10f)
+                reflectiveCurveTo(17.52f, 2f, 12f, 2f)
+                close()
+                moveToRelative(1f, 17f)
+                horizontalLineToRelative(-2f)
+                verticalLineToRelative(-2f)
+                horizontalLineToRelative(2f)
+                verticalLineToRelative(2f)
+                close()
+                moveToRelative(2.07f, -7.75f)
+                lineToRelative(-0.9f, 0.92f)
+                curveTo(13.45f, 12.9f, 13f, 13.5f, 13f, 15f)
+                horizontalLineToRelative(-2f)
+                verticalLineToRelative(-0.5f)
+                curveToRelative(0f, -1.1f, 0.45f, -2.1f, 1.17f, -2.83f)
+                lineToRelative(1.24f, -1.26f)
+                curveToRelative(0.37f, -0.36f, 0.59f, -0.86f, 0.59f, -1.41f)
+                curveToRelative(0f, -1.1f, -0.9f, -2f, -2f, -2f)
+                reflectiveCurveToRelative(-2f, 0.9f, -2f, 2f)
+                horizontalLineTo(8f)
+                curveToRelative(0f, -2.21f, 1.79f, -4f, 4f, -4f)
+                reflectiveCurveToRelative(4f, 1.79f, 4f, 4f)
+                curveToRelative(0f, 0.88f, -0.36f, 1.68f, -0.93f, 2.25f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Hediye kartı (card_giftcard) — profil "Davet et · ₺50 kazan" satırı. */
+    val Gift: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarGift",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(20f, 6f)
+                horizontalLineToRelative(-2.18f)
+                curveToRelative(0.11f, -0.31f, 0.18f, -0.65f, 0.18f, -1f)
+                curveToRelative(0f, -1.66f, -1.34f, -3f, -3f, -3f)
+                curveToRelative(-1.05f, 0f, -1.96f, 0.54f, -2.5f, 1.35f)
+                lineToRelative(-0.5f, 0.67f)
+                lineToRelative(-0.5f, -0.68f)
+                curveTo(10.96f, 2.54f, 10.05f, 2f, 9f, 2f)
+                curveTo(7.34f, 2f, 6f, 3.34f, 6f, 5f)
+                curveToRelative(0f, 0.35f, 0.07f, 0.69f, 0.18f, 1f)
+                horizontalLineTo(4f)
+                curveToRelative(-1.11f, 0f, -1.99f, 0.89f, -1.99f, 2f)
+                lineTo(2f, 19f)
+                curveToRelative(0f, 1.11f, 0.89f, 2f, 2f, 2f)
+                horizontalLineToRelative(16f)
+                curveToRelative(1.11f, 0f, 2f, -0.89f, 2f, -2f)
+                verticalLineTo(8f)
+                curveToRelative(0f, -1.11f, -0.89f, -2f, -2f, -2f)
+                close()
+                moveToRelative(-5f, -2f)
+                curveToRelative(0.55f, 0f, 1f, 0.45f, 1f, 1f)
+                reflectiveCurveToRelative(-0.45f, 1f, -1f, 1f)
+                reflectiveCurveToRelative(-1f, -0.45f, -1f, -1f)
+                reflectiveCurveToRelative(0.45f, -1f, 1f, -1f)
+                close()
+                moveTo(9f, 4f)
+                curveToRelative(0.55f, 0f, 1f, 0.45f, 1f, 1f)
+                reflectiveCurveToRelative(-0.45f, 1f, -1f, 1f)
+                reflectiveCurveToRelative(-1f, -0.45f, -1f, -1f)
+                reflectiveCurveToRelative(0.45f, -1f, 1f, -1f)
+                close()
+                moveToRelative(11f, 15f)
+                horizontalLineTo(4f)
+                verticalLineToRelative(-2f)
+                horizontalLineToRelative(16f)
+                verticalLineToRelative(2f)
+                close()
+                moveToRelative(0f, -5f)
+                horizontalLineTo(4f)
+                verticalLineTo(8f)
+                horizontalLineToRelative(5.08f)
+                lineTo(7f, 10.83f)
+                lineTo(8.62f, 12f)
+                lineTo(11f, 8.76f)
+                lineToRelative(1f, -1.36f)
+                lineToRelative(1f, 1.36f)
+                lineTo(15.38f, 12f)
+                lineTo(17f, 10.83f)
+                lineTo(14.92f, 8f)
+                horizontalLineTo(20f)
+                verticalLineToRelative(6f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Kapıdan çıkış oku (logout) — profil "Çıkış yap" satırı. */
+    val Logout: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarLogout",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(17f, 7f)
+                lineToRelative(-1.41f, 1.41f)
+                lineTo(18.17f, 11f)
+                horizontalLineTo(8f)
+                verticalLineToRelative(2f)
+                horizontalLineToRelative(10.17f)
+                lineToRelative(-2.58f, 2.58f)
+                lineTo(17f, 17f)
+                lineToRelative(5f, -5f)
+                close()
+                moveTo(4f, 5f)
+                horizontalLineToRelative(8f)
+                verticalLineTo(3f)
+                horizontalLineTo(4f)
+                curveToRelative(-1.1f, 0f, -2f, 0.9f, -2f, 2f)
+                verticalLineToRelative(14f)
+                curveToRelative(0f, 1.1f, 0.9f, 2f, 2f, 2f)
+                horizontalLineToRelative(8f)
+                verticalLineToRelative(-2f)
+                horizontalLineTo(4f)
+                verticalLineTo(5f)
+                close()
+            }
+        }.build()
+    }
 }
