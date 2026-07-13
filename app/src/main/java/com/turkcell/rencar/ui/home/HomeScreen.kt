@@ -32,6 +32,7 @@ import com.turkcell.rencar.ui.theme.RenCarTheme
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    onNavigateToReservation: (vehicleId: String) -> Unit = {},
     tabNavController: NavHostController = rememberNavController(),
 ) {
     val backStackEntry by tabNavController.currentBackStackEntryAsState()
@@ -63,7 +64,9 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            composable(RencarDestinations.MAP) { MapScreen() }
+            composable(RencarDestinations.MAP) {
+                MapScreen(onNavigateToReservation = onNavigateToReservation)
+            }
             composable(RencarDestinations.HISTORY) { PlaceholderScreen("Geçmiş") }
             composable(RencarDestinations.WALLET) { PlaceholderScreen("Cüzdan") }
             composable(RencarDestinations.PROFILE) { ProfileScreen() }

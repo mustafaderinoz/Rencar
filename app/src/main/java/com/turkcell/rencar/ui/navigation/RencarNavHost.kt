@@ -17,6 +17,7 @@ import com.turkcell.rencar.ui.license.LicenseScreen
 import com.turkcell.rencar.ui.licensepending.LicensePendingScreen
 import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
+import com.turkcell.rencar.ui.reservation.ReservationScreen
 import com.turkcell.rencar.ui.selfie.SelfieScreen
 
 /**
@@ -117,8 +118,26 @@ fun RencarNavHost(
             LicensePendingScreen()
         }
         // Home: Harita/Geçmiş/Cüzdan/Profil sekmelerini barındıran alt navigasyonlu kabuk.
+        // Araç detayındaki "Rezerve Et" → rezervasyon onayı (Home kabuğunun üstünde tam ekran).
         composable(RencarDestinations.HOME) {
-            HomeScreen()
+            HomeScreen(
+                onNavigateToReservation = { vehicleId ->
+                    navController.navigate(RencarDestinations.reservationRoute(vehicleId))
+                },
+            )
+        }
+        // Rezervasyon onayı: vehicleId path argümanını taşır (ReservationViewModel SavedStateHandle ile okur).
+        composable(
+            route = RencarDestinations.RESERVATION_ROUTE,
+            arguments = listOf(
+                navArgument(RencarDestinations.RESERVATION_ARG_VEHICLE_ID) { type = NavType.StringType },
+            ),
+        ) {
+            ReservationScreen(
+                onNavigateBack = { navController.popBackStack() },
+                // POST /reservations başarılı → onay ekranını kapatıp haritaya (Home) dön.
+                onReserved = { navController.popBackStack() },
+            )
         }
     }
 }

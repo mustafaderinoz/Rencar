@@ -62,6 +62,7 @@ private val LOCATION_PERMISSIONS = arrayOf(
 @Composable
 fun MapScreen(
     modifier: Modifier = Modifier,
+    onNavigateToReservation: (vehicleId: String) -> Unit = {},
     viewModel: MapViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -135,6 +136,7 @@ fun MapScreen(
                 else -> viewModel.onIntent(intent)
             }
         },
+        onNavigateToReservation = onNavigateToReservation,
         modifier = modifier,
     )
 }
@@ -146,6 +148,7 @@ private fun MapScreen(
     uiState: MapUiState,
     controller: RencarMapController,
     onIntent: (MapIntent) -> Unit,
+    onNavigateToReservation: (vehicleId: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -204,7 +207,8 @@ private fun MapScreen(
 
         // Araca dokununca detay alt sayfası (bottom sheet) açılır; veri GET /vehicles/{id}'den gelir.
         // Uzaklık için anlık kullanıcı konumu iletilir (yoksa uzaklık satırı gizlenir).
-        if (uiState.selectedVehicleId != null) {
+        val selectedVehicleId = uiState.selectedVehicleId
+        if (selectedVehicleId != null) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             ModalBottomSheet(
                 onDismissRequest = { onIntent(MapIntent.VehicleDismissed) },
@@ -212,9 +216,14 @@ private fun MapScreen(
                 containerColor = MaterialTheme.colorScheme.surface,
             ) {
                 VehicleDetailScreen(
-                    vehicleId = uiState.selectedVehicleId,
+                    vehicleId = selectedVehicleId,
                     userLatitude = uiState.myLocation?.latitude,
                     userLongitude = uiState.myLocation?.longitude,
+                    // "Rezerve Et" → alt sayfayı kapat ve rezervasyon onayına git.
+                    onReserve = {
+                        onIntent(MapIntent.VehicleDismissed)
+                        onNavigateToReservation(selectedVehicleId)
+                    },
                 )
             }
         }

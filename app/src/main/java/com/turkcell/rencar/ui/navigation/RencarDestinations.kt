@@ -47,6 +47,15 @@ object RencarDestinations {
     /** 04 Home — alt navigasyonlu (Harita/Geçmiş/Cüzdan/Profil) ana kabuk. */
     const val HOME = "home"
 
+    // 07 Rezervasyon onayı — araç detayındaki "Rezerve Et" ile açılır; rezerve edilecek aracın
+    // id'sini path argümanı olarak taşır: "reservation/{vehicleId}".
+    const val RESERVATION = "reservation"
+    const val RESERVATION_ARG_VEHICLE_ID = "vehicleId"
+    const val RESERVATION_ROUTE = "$RESERVATION/{$RESERVATION_ARG_VEHICLE_ID}"
+
+    /** Belirli bir araç için somut rezervasyon rotasını üretir ([Uri.encode] ile güvenli kodlama). */
+    fun reservationRoute(vehicleId: String): String = "$RESERVATION/${Uri.encode(vehicleId)}"
+
     // Home içindeki nested NavHost sekme rotaları (MainScreen). İçerikler şimdilik placeholder.
     const val MAP = "map"
     const val HISTORY = "history"
