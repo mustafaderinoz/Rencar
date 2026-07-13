@@ -48,6 +48,12 @@ class MapViewModel @Inject constructor(
             MapIntent.RecenterClicked -> Unit
 
             MapIntent.LoadVehicles -> loadVehicles()
+
+            is MapIntent.VehicleClicked ->
+                _uiState.update { it.copy(selectedVehicleId = intent.id) }
+
+            MapIntent.VehicleDismissed ->
+                _uiState.update { it.copy(selectedVehicleId = null) }
         }
     }
 

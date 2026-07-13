@@ -24,8 +24,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Backend API kökü. Swagger /api/docs altında olsa da endpoint'ler KÖK dizinde
-        // (/health, /auth/login → 200; /api/... → 404). Doğrulandı: curl probe, 09.07.2026.
-        buildConfigField("String", "BASE_URL", "\"https://rencar.halitkalayci.com/\"")
+        // (/health, /auth/login → 200; /api/... → 404).
+        // v2 sunucusu docs/api/openapi.json ile paraleldir (pricePerMinute/fuelPercent/seats vb.
+        // + /reservations, /wallet döner); eski `rencar.halitkalayci.com` bu alanları döndürmüyordu.
+        // Doğrulandı: curl swagger-ui-init.js probe, 13.07.2026.
+        buildConfigField("String", "BASE_URL", "\"https://rencarv2.halitkalayci.com/\"")
     }
 
     buildTypes {

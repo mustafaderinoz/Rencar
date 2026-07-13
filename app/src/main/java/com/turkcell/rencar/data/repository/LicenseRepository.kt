@@ -2,6 +2,7 @@ package com.turkcell.rencar.data.repository
 
 import com.turkcell.rencar.data.remote.api.LicenseApi
 import com.turkcell.rencar.data.remote.dto.LicenseResponse
+import com.turkcell.rencar.data.remote.dto.LicenseStatusResponse
 import com.turkcell.rencar.data.util.ImageCompressor
 import java.io.File
 import javax.inject.Inject
@@ -27,6 +28,11 @@ class LicenseRepository @Inject constructor(
         val frontPart = front.toImagePart(field = "front")
         val backPart = back.toImagePart(field = "back")
         licenseApi.upload(front = frontPart, back = backPart)
+    }
+
+    /** Mevcut kullanıcının ehliyet durumunu getirir (NOT_SUBMITTED/UNDER_REVIEW/APPROVED/REJECTED). */
+    suspend fun getStatus(): Result<LicenseStatusResponse> = runCatching {
+        licenseApi.status()
     }
 
     /** Dosyayı sıkıştırıp "field" adıyla JPEG multipart parçasına dönüştürür. */

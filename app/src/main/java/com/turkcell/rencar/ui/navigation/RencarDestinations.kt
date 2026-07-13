@@ -28,6 +28,12 @@ object RencarDestinations {
     /** 05 Ehliyet doğrulama (1. adım) — PENDING kullanıcı OTP sonrası buraya yönlenir. */
     const val LICENSE = "license"
 
+    /**
+     * 05b Ehliyet bekleme — ehliyeti incelemede (UNDER_REVIEW) olan PENDING kullanıcı buraya
+     * kilitlenir; onay gelene kadar uygulama kullanılamaz (geri tuşu ekranda yutulur).
+     */
+    const val LICENSE_PENDING = "license_pending"
+
     // 06 Selfie doğrulama (2. adım): çekilen ehliyet ön/arka yollarını path argümanı taşır.
     const val SELFIE = "selfie"
     const val SELFIE_ARG_FRONT = "frontPath"

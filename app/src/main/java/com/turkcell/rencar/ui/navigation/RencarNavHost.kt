@@ -14,6 +14,7 @@ import androidx.navigation.navArgument
 import com.turkcell.rencar.ui.login.LoginScreen
 import com.turkcell.rencar.ui.home.HomeScreen
 import com.turkcell.rencar.ui.license.LicenseScreen
+import com.turkcell.rencar.ui.licensepending.LicensePendingScreen
 import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
 import com.turkcell.rencar.ui.selfie.SelfieScreen
@@ -31,9 +32,8 @@ fun RencarNavHost(
 ) {
     NavHost(
         navController = navController,
-        // GEÇİCİ: harita geliştirmesi için başlangıç doğrudan Home'a. Kalıcı akış ONBOARDING'dir;
-        // geri almak için aşağıdaki satırı RencarDestinations.ONBOARDING yap.
         startDestination = RencarDestinations.ONBOARDING,
+
         // Geçiş (fade) sırasında ekranlar yarı saydamken aralarından kök/pencere arka planı
         // görünüp parlak bir "patlama"ya yol açıyordu; surface zemini bu sızıntıyı kapatır.
         modifier = modifier
@@ -64,10 +64,16 @@ fun RencarNavHost(
         ) {
             OtpVerificationScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // PENDING kullanıcı → ehliyet doğrulama akışı; onaylı (CUSTOMER/ADMIN) → Home.
-                // Her iki durumda da OTP öncesi akış (onboarding→login→otp) geri yığından temizlenir.
+                // PENDING + yüklenmemiş/reddedilmiş → ehliyet doğrulama; incelemede → bekleme ekranı;
+                // onaylı (CUSTOMER/ADMIN veya APPROVED) → Home. Her durumda OTP öncesi akış
+                // (onboarding→login→otp) geri yığından temizlenir.
                 onNavigateToLicense = {
                     navController.navigate(RencarDestinations.LICENSE) {
+                        popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
+                    }
+                },
+                onNavigateToLicensePending = {
+                    navController.navigate(RencarDestinations.LICENSE_PENDING) {
                         popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
                     }
                 },
@@ -97,13 +103,18 @@ fun RencarNavHost(
         ) {
             SelfieScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // Yükleme başarılı → Home. Ehliyet+selfie geri yığından temizlenir.
-                onNavigateToHome = {
-                    navController.navigate(RencarDestinations.HOME) {
-                        popUpTo(RencarDestinations.LICENSE) { inclusive = true }
+                // Yükleme başarılı → ehliyet UNDER_REVIEW; kullanıcı bekleme ekranına kilitlenir.
+                // Tüm önceki akış (onboarding→…→selfie) geri yığından temizlenir.
+                onNavigateToPending = {
+                    navController.navigate(RencarDestinations.LICENSE_PENDING) {
+                        popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
                     }
                 },
             )
+        }
+        // Ehliyet bekleme: incelemedeki (UNDER_REVIEW) kullanıcı buraya kilitlenir (çıkılamaz).
+        composable(RencarDestinations.LICENSE_PENDING) {
+            LicensePendingScreen()
         }
         // Home: Harita/Geçmiş/Cüzdan/Profil sekmelerini barındıran alt navigasyonlu kabuk.
         composable(RencarDestinations.HOME) {

@@ -25,6 +25,8 @@ data class MapUiState(
     val isLoadingVehicles: Boolean = false,
     /** Araç yüklemesi başarısızsa kullanıcıya gösterilecek mesaj (yoksa null). */
     val vehiclesError: String? = null,
+    /** Haritada bir araca dokunulunca seçilen aracın id'si; detay alt sayfasını (bottom sheet) açar (null → kapalı). */
+    val selectedVehicleId: String? = null,
 )
 
 /**
@@ -45,4 +47,10 @@ sealed interface MapIntent {
 
     /** Müsait araçları GET /vehicles ile yükle (ekran açılışında tetiklenir). */
     data object LoadVehicles : MapIntent
+
+    /** Haritada bir araca dokunuldu; detay alt sayfasını açmak için seçili id ayarlanır. */
+    data class VehicleClicked(val id: String) : MapIntent
+
+    /** Detay alt sayfası kapatıldı; seçim temizlenir. */
+    data object VehicleDismissed : MapIntent
 }

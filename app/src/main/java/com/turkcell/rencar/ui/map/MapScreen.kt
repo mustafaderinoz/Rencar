@@ -7,13 +7,24 @@ import android.content.pm.PackageManager
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -37,6 +49,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.turkcell.rencar.ui.icons.RencarIcons
 import com.turkcell.rencar.ui.theme.RenCarTheme
+import com.turkcell.rencar.ui.vehicledetail.VehicleDetailScreen
 import org.maplibre.android.geometry.LatLng
 
 /** İnce + kaba konum izinleri; ikisinden biri yeterlidir. */
@@ -127,6 +140,7 @@ fun MapScreen(
 }
 
 // ── Stateless gövde (§4.5): uiState + onIntent ile çizer; `controller` harita görünüm tutamacıdır ──
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MapScreen(
     uiState: MapUiState,
@@ -140,6 +154,7 @@ private fun MapScreen(
             modifier = Modifier.fillMaxSize(),
             controller = controller,
             vehicles = uiState.vehicles,
+            onVehicleClick = { id -> onIntent(MapIntent.VehicleClicked(id)) },
         )
 
         // Sağ alt -> konumu yeniden al ve kamerayı tekrar zoomla.
@@ -153,6 +168,55 @@ private fun MapScreen(
             contentColor = MaterialTheme.colorScheme.primary,
         ) {
             Icon(RencarIcons.MyLocation, contentDescription = "Konumuma git")
+        }
+
+        // Araç yükleme hatası — sessiz kalmasın diye üstte görünür banner + tekrar dene.
+        if (uiState.vehiclesError != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                shape = RoundedCornerShape(12.dp),
+                tonalElevation = 2.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = uiState.vehiclesError,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = "Tekrar dene",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable { onIntent(MapIntent.LoadVehicles) },
+                    )
+                }
+            }
+        }
+
+        // Araca dokununca detay alt sayfası (bottom sheet) açılır; veri GET /vehicles/{id}'den gelir.
+        // Uzaklık için anlık kullanıcı konumu iletilir (yoksa uzaklık satırı gizlenir).
+        if (uiState.selectedVehicleId != null) {
+            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            ModalBottomSheet(
+                onDismissRequest = { onIntent(MapIntent.VehicleDismissed) },
+                sheetState = sheetState,
+                containerColor = MaterialTheme.colorScheme.surface,
+            ) {
+                VehicleDetailScreen(
+                    vehicleId = uiState.selectedVehicleId,
+                    userLatitude = uiState.myLocation?.latitude,
+                    userLongitude = uiState.myLocation?.longitude,
+                )
+            }
         }
     }
 }

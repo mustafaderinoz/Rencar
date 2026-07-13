@@ -278,12 +278,12 @@
     },
     "/license/upload": {
       "post": {
-        "description": "Giriş yapmış kullanıcı ehliyet fotoğraflarını yükler; kayıt UNDER_REVIEW durumuna geçer. Kullanıcı zaten CUSTOMER ise veya hâlihazırda incelemede bir kaydı varsa işlem engellenir. REJECTED durumundaki kullanıcı yeniden yükleyebilir (durum yeniden UNDER_REVIEW olur, red gerekçesi silinir).",
+        "description": "Giriş yapmış kullanıcı ehliyet fotoğraflarını ve selfie'sini yükler; kayıt UNDER_REVIEW durumuna geçer. Selfie YENİ başvurularda zorunludur (D5 — tasarımın üçüncü doğrulama adımı; eski kayıtlar selfie'siz kalabilir). Kullanıcı zaten CUSTOMER ise veya hâlihazırda incelemede bir kaydı varsa işlem engellenir. REJECTED durumundaki kullanıcı yeniden yükleyebilir (durum yeniden UNDER_REVIEW olur, red gerekçesi silinir).",
         "operationId": "LicenseController_upload",
         "parameters": [],
         "requestBody": {
           "required": true,
-          "description": "Ehliyetin ön (front) ve arka (back) yüz fotoğrafları.",
+          "description": "Ehliyetin ön (front) ve arka (back) yüz fotoğrafları + yüz doğrulama selfie'si (selfie).",
           "content": {
             "multipart/form-data": {
               "schema": {
@@ -321,7 +321,7 @@
             "access-token": []
           }
         ],
-        "summary": "Ehliyet yükle (ön + arka)",
+        "summary": "Ehliyet yükle (ön + arka + selfie)",
         "tags": [
           "License"
         ]
@@ -616,7 +616,7 @@
         ]
       },
       "get": {
-        "description": "Durumdan bağımsız tüm araçlar. Tip/durum ile filtrelenebilir, opsiyonel sayfalama (page/limit).",
+        "description": "Durumdan bağımsız tüm araçlar. Tip/segment/durum ile filtrelenebilir, opsiyonel sayfalama (page/limit).",
         "operationId": "AdminVehicleController_list",
         "parameters": [
           {
@@ -637,6 +637,21 @@
             }
           },
           {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "description": "Fiyat segmentine göre filtreler (tasarımdaki Tümü/Ekonomik/Konfor/SUV sekmeleri). Boş bırakılırsa tüm segmentler döner.",
+            "schema": {
+              "example": "SUV",
+              "type": "string",
+              "enum": [
+                "ECONOMY",
+                "COMFORT",
+                "SUV"
+              ]
+            }
+          },
+          {
             "name": "status",
             "required": false,
             "in": "query",
@@ -646,6 +661,7 @@
               "type": "string",
               "enum": [
                 "AVAILABLE",
+                "RESERVED",
                 "RENTED",
                 "MAINTENANCE"
               ]
@@ -852,7 +868,7 @@
     },
     "/vehicles": {
       "get": {
-        "description": "Yalnızca AVAILABLE araçları döner (müsaitlik = status AVAILABLE). RENTED/MAINTENANCE araçlar görünmez. Tipe göre filtre + sayfalama desteklenir; durum filtresi müşteriye AÇIK DEĞİLDİR.",
+        "description": "Varsayılan yalnızca AVAILABLE araçları döner (müsaitlik = status AVAILABLE). includeBusy=true ile RENTED ve RESERVED araçlar da döner (harita gri marker'ları için; istemci status alanına bakar). MAINTENANCE hiçbir zaman dönmez. Tip ve segmente (Ekonomik/Konfor/SUV sekmeleri) göre filtre + sayfalama desteklenir; durum filtresi müşteriye AÇIK DEĞİLDİR.",
         "operationId": "VehicleController_list",
         "parameters": [
           {
@@ -869,6 +885,21 @@
                 "HATCHBACK",
                 "STATION",
                 "MINIVAN"
+              ]
+            }
+          },
+          {
+            "name": "segment",
+            "required": false,
+            "in": "query",
+            "description": "Fiyat segmentine göre filtreler (tasarımdaki Tümü/Ekonomik/Konfor/SUV sekmeleri). Boş bırakılırsa tüm segmentler döner.",
+            "schema": {
+              "example": "SUV",
+              "type": "string",
+              "enum": [
+                "ECONOMY",
+                "COMFORT",
+                "SUV"
               ]
             }
           },
@@ -893,6 +924,20 @@
               "maximum": 100,
               "example": 20,
               "type": "number"
+            }
+          },
+          {
+            "name": "includeBusy",
+            "required": false,
+            "in": "query",
+            "description": "true ise RENTED ve RESERVED (kullanımda/tutulmuş) araçlar da döner — harita gri marker'ları için. MAINTENANCE hiçbir zaman dönmez. Varsayılan: yalnız AVAILABLE.",
+            "schema": {
+              "example": "true",
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
             }
           }
         ],
@@ -928,9 +973,85 @@
         ]
       }
     },
+    "/vehicles/{id}/quote": {
+      "get": {
+        "description": "Seçilen plan ve tahmini süre (dakika) için ücret dökümü hesaplar — tasarımdaki \"Tahmini ücret\" satırı. SALT HESAP: hiçbir kayıt oluşturmaz, aracı kilitlemez. Formüller finish faturasıyla birebir aynıdır. Görünürlük kuralı araç detayıyla aynıdır (görünmeyen araç 404).",
+        "operationId": "VehicleController_quote",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plan",
+            "required": true,
+            "in": "query",
+            "description": "Fiyatı sorulan plan.",
+            "schema": {
+              "example": "PER_MINUTE",
+              "type": "string",
+              "enum": [
+                "PER_MINUTE",
+                "HOURLY",
+                "DAILY"
+              ]
+            }
+          },
+          {
+            "name": "minutes",
+            "required": true,
+            "in": "query",
+            "description": "Tahmini kullanım süresi (dakika). DAILY planda güne çevrilir (başlanmış gün tam sayılır, en az 1 gün).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 43200,
+              "example": 30,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz plan veya minutes (1..43200 tam sayı olmalı)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar (ör. PENDING) 403 alır."
+          },
+          "404": {
+            "description": "Araç bulunamadı veya bu kullanıcıya görünür değil."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Fiyat önizleme (tahmini ücret)",
+        "tags": [
+          "Vehicles"
+        ]
+      }
+    },
     "/vehicles/{id}": {
       "get": {
-        "description": "Tek bir AVAILABLE aracın detayı. Araç müsait değilse (RENTED/MAINTENANCE) veya yoksa 404 döner.",
+        "description": "Tek aracın detayı. AVAILABLE araçları herkes görür; müsait olmayan (ör. RENTED) aracı YALNIZCA o araçta aktif kiralaması olan müşteri görür (aktif kiralama ekranı için). Diğer tüm durumlarda 404 döner.",
         "operationId": "VehicleController_getOne",
         "parameters": [
           {
@@ -960,7 +1081,7 @@
             "description": "CUSTOMER olmayan kullanıcılar (ör. PENDING) 403 alır."
           },
           "404": {
-            "description": "Araç bulunamadı veya müsait değil."
+            "description": "Araç bulunamadı veya bu kullanıcıya görünür değil."
           }
         },
         "security": [
@@ -968,7 +1089,7 @@
             "access-token": []
           }
         ],
-        "summary": "Müsait araç detayı",
+        "summary": "Araç detayı",
         "tags": [
           "Vehicles"
         ]
@@ -976,7 +1097,7 @@
     },
     "/rentals": {
       "post": {
-        "description": "Seçilen aracı ANINDA kiralar. startDate sunucuda now'dur; yalnızca vehicleId + endDate gönderilir. Araç AVAILABLE değilse veya kullanıcının zaten aktif bir kiralaması varsa 409 döner. Fiyat oluştururken kilitlenir.",
+        "description": "plan PER_MINUTE/HOURLY ise yolculuk PREPARING durumunda açılır (D5): araç sizin için kilitlenir ama SÜRE İŞLEMEZ — aracın 4 yönünü POST /rentals/:id/photos ile fotoğraflayıp POST /rentals/:id/start çağırınca ACTIVE olur (startedAt o anda atılır). Fiyat yolculuk SONUNDA hesaplanır (endDate gönderilmez, açılış ücreti kilitlenir). plan DAILY (veya hiç gönderilmemiş — geriye uyum) ise ESKİ davranış: endDate zorunludur, fiyat baştan kilitlenir ve yolculuk ANINDA ACTIVE başlar (foto adımı yoktur). KURAL: kiralama YALNIZ rezervasyon sonrası açılır — bu araçta AKTİF rezervasyonunuz yoksa 409 dönülür; varsa rezervasyon CONVERTED işaretlenir ve araç RESERVED -\u003E RENTED geçer.",
         "operationId": "RentalController_create",
         "parameters": [],
         "requestBody": {
@@ -991,7 +1112,7 @@
         },
         "responses": {
           "201": {
-            "description": "Kiralama oluşturuldu; araç RENTED.",
+            "description": "Yolculuk açıldı; araç RENTED (dk/sa planında durum PREPARING).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1001,7 +1122,7 @@
             }
           },
           "400": {
-            "description": "Geçersiz gövde (ör. endDate geçmişte)."
+            "description": "Geçersiz gövde (DAILY'de endDate eksik/geçmişte; dk/sa planında endDate verilmiş)."
           },
           "401": {
             "description": "Token eksik veya geçersiz."
@@ -1013,7 +1134,7 @@
             "description": "Araç bulunamadı."
           },
           "409": {
-            "description": "Araç müsait değil VEYA zaten aktif bir kiralamanız var."
+            "description": "Bu araçta aktif rezervasyonunuz yok VEYA zaten aktif kiralamanız var VEYA başka araçta aktif rezervasyonunuz var VEYA araç kiralanabilir değil."
           }
         },
         "security": [
@@ -1021,7 +1142,7 @@
             "access-token": []
           }
         ],
-        "summary": "Araç kirala (anlık)",
+        "summary": "Yolculuk aç (dk/sa: PREPARING + foto akışı; DAILY: doğrudan başlar)",
         "tags": [
           "Rentals"
         ]
@@ -1062,10 +1183,159 @@
         ]
       }
     },
-    "/rentals/{id}/return": {
+    "/rentals/stats": {
+      "get": {
+        "description": "Seçilen aydaki (varsayılan: bu ay, UTC) TAMAMLANMIŞ yolculukların özeti: sayı, toplam harcama (yalnız ödenmiş; indirim sonrası), toplam süre (dk) ve mesafe (km). Tasarımın \"Bu ay 6 yolculuk · ₺612 harcama\" başlığı ve profil rozetleri bu uçtan beslenir. Boş ay sıfırlarla döner.",
+        "operationId": "RentalController_stats",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "İstatistiği istenen ay (YYYY-MM). Varsayılan: bu ay (UTC).",
+            "schema": {
+              "example": "2026-07",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalStatsResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "month biçimi geçersiz (YYYY-MM olmalı)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Aylık yolculuk özetim",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/rentals/active": {
+      "get": {
+        "description": "Süren yolculuğun ANLIK durumu: geçen süre (elapsedSeconds), şu an bitirilse ödenecek tahmini tutar (currentCost) ve biriken mesafe (distanceKm). Değerler her istekte sunucu saatiyle hesaplanır; istemci bu ucu periyodik yoklar. Aktif yolculuk yoksa 404.",
+        "operationId": "RentalController_getActive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveRentalResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Aktif kiralama yok."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Aktif yolculuğum (anlık durum)",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/rentals/{id}/photos": {
       "post": {
-        "description": "Aktif kiralamayı tamamlar (COMPLETED) ve aracı tekrar AVAILABLE yapar. totalPrice değişmez (geç iade ücreti yoktur). Kiralama size ait değilse 403, yoksa 404, zaten iade/iptal ise 409.",
-        "operationId": "RentalController_return",
+        "description": "PREPARING aşamasındaki yolculuğa bir yönün (FRONT/BACK/LEFT/RIGHT) fotoğrafını yükler. Aynı yöne ikinci yükleme ÖNCEKİNİ değiştirir (sayaç artmaz). Cevap akışın anlık durumudur (\"2/4 çekildi\" sayacı buradan beslenir). 4 yön tamamlanınca start çağrılabilir.",
+        "operationId": "RentalController_uploadPhoto",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Yön (side) + araç fotoğrafı (file).",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/UploadRentalPhotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Foto kaydedildi; güncel durum cevapta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalPhotosStateDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dosya eksik/geçersiz (jpg/png değil) veya side hatalı."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "Kiralama bu kullanıcıya ait değil."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          },
+          "409": {
+            "description": "Yolculuk PREPARING aşamasında değil (zaten başladı/bitti)."
+          },
+          "413": {
+            "description": "Dosya çok büyük (maks. 5MB)."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Yolculuk öncesi araç fotoğrafı yükle (4 yön)",
+        "tags": [
+          "Rentals"
+        ]
+      },
+      "get": {
+        "description": "Yüklenen yönler + eksik yönler. İstemci, uygulama yeniden açıldığında yarım kalan foto akışını buradan devralır.",
+        "operationId": "RentalController_getPhotos",
         "parameters": [
           {
             "name": "id",
@@ -1078,7 +1348,53 @@
         ],
         "responses": {
           "200": {
-            "description": "İade alındı; kiralama COMPLETED.",
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalPhotosStateDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Yolculuğun foto akışı durumu",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/rentals/{id}/start": {
+      "post": {
+        "description": "PREPARING yolculuğu ACTIVE yapar. 4 yönün tamamı yüklenmemişse 409 (kalan sayıyla). startedAt BU ANDA atılır: foto çekerken geçen süre faturalanmaz.",
+        "operationId": "RentalController_start",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Yolculuk başladı; süre işliyor.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1097,7 +1413,7 @@
             "description": "Kiralama bulunamadı."
           },
           "409": {
-            "description": "Yalnızca aktif kiralamalar iade edilebilir."
+            "description": "Fotoğraflar eksik (\"N foto kaldı\") VEYA yolculuk zaten başladı/bitti."
           }
         },
         "security": [
@@ -1105,13 +1421,53 @@
             "access-token": []
           }
         ],
-        "summary": "Kiralamayı iade et",
+        "summary": "Yolculuğu fiilen başlat (4 foto sonrası)",
         "tags": [
           "Rentals"
         ]
       }
     },
     "/rentals/{id}": {
+      "delete": {
+        "description": "Henüz başlamamış (PREPARING) yolculuğu iptal eder (CANCELLED); araç anında tekrar AVAILABLE olur. Başlamış (ACTIVE) yolculuk iptal EDİLEMEZ — finish ile bitirilir.",
+        "operationId": "RentalController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "İptal edildi; araç AVAILABLE."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "Kiralama bu kullanıcıya ait değil."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          },
+          "409": {
+            "description": "Yolculuk PREPARING aşamasında değil."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Hazırlıktaki yolculuğu iptal et (yalnız PREPARING)",
+        "tags": [
+          "Rentals"
+        ]
+      },
       "get": {
         "description": "Tek kiralamanın detayı. Başka kullanıcının kiralaması 404 döner.",
         "operationId": "RentalController_getMine",
@@ -1157,6 +1513,166 @@
         ]
       }
     },
+    "/rentals/{id}/finish": {
+      "post": {
+        "description": "Aktif yolculuğu tamamlar (COMPLETED), aracı AVAILABLE yapar ve ücreti KİLİTLER. PER_MINUTE: ceil(saniye/60)*pricePerMinute; HOURLY: ceil(dakika/60)*pricePerHour; + açılış ücreti + servis ücreti (kullanımın yüzdesi, yukarı 0.5'e yuvarlı). DAILY planda fiyat baştan kilitliydi, değişmez. Cevap kalem kalem dökümdür.",
+        "operationId": "RentalController_finish",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Yolculuk bitti; döküm cevapta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinishRentalResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "Kiralama bu kullanıcıya ait değil."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          },
+          "409": {
+            "description": "Yalnızca aktif kiralamalar bitirilebilir."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Yolculuğu bitir (ücret dökümüyle)",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/rentals/{id}/return": {
+      "post": {
+        "description": "Günlük (DAILY) kiralamayı tamamlar; totalPrice değişmez (geç iade ücreti yoktur). Geriye uyum için korunur — kullanım bazlı yolculuklar için POST /rentals/:id/finish kullanın (dk/sa planında bu uç 409 döner).",
+        "operationId": "RentalController_return",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "İade alındı; kiralama COMPLETED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentalResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "Kiralama bu kullanıcıya ait değil."
+          },
+          "404": {
+            "description": "Kiralama bulunamadı."
+          },
+          "409": {
+            "description": "Kiralama aktif değil VEYA plan DAILY değil (finish kullanılmalı)."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kiralamayı iade et (ESKİ uç — yalnız DAILY)",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
+    "/rentals/{id}/pay": {
+      "post": {
+        "description": "Tamamlanmış (COMPLETED) ve henüz ödenmemiş yolculuğun ödemesini alır. method WALLET ise tutar cüzdan bakiyesinden düşülür (yetersizse 409 ve hiçbir kayıt değişmez); CARD ise kayıtlı kartla ödeme \"başarılı\" SİMÜLE edilir (cardId zorunlu). discountCode verilirse indirim toplamdan düşülür (yüzde veya sabit TL; ödenecek tutar 0'ın altına inmez). Cevap ödeme makbuzudur (tutar dökümü + yöntem detayı).",
+        "operationId": "RentalController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayRentalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ödeme alındı; makbuz cevapta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayRentalResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz gövde (CARD'da cardId eksik; WALLET'ta cardId verilmiş)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "Kiralama bu kullanıcıya ait değil."
+          },
+          "404": {
+            "description": "Kiralama, kart veya indirim kodu bulunamadı."
+          },
+          "409": {
+            "description": "Kiralama COMPLETED değil VEYA ödemesi zaten alınmış VEYA cüzdan bakiyesi yetersiz VEYA indirim kodu limiti/tek-kullanım kuralı ihlali."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Yolculuğu öde (cüzdan veya simüle kart)",
+        "tags": [
+          "Rentals"
+        ]
+      }
+    },
     "/admin/rentals": {
       "get": {
         "description": "Tüm kiralamalar; status/userId/vehicleId ile filtrelenebilir, opsiyonel sayfalama. Kullanıcı ve araç özetleriyle döner.",
@@ -1171,6 +1687,7 @@
               "example": "ACTIVE",
               "type": "string",
               "enum": [
+                "PREPARING",
                 "ACTIVE",
                 "COMPLETED",
                 "CANCELLED"
@@ -1299,6 +1816,471 @@
         ]
       }
     },
+    "/reservations": {
+      "post": {
+        "description": "Aracı kısa süreliğine tutar (vehicle RESERVED olur); süre sunucu konfigürasyonundan gelir (RESERVATION_TTL_MIN, varsayılan 15 dk) ve ÜCRETSİZDİR. Süre dolarsa araç kendiliğinden boşa çıkar. Araç müsait değilse, zaten aktif bir rezervasyonunuz ya da kiralamanız varsa 409.",
+        "operationId": "ReservationController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReservationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Rezervasyon oluşturuldu; araç RESERVED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz gövde (validation)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar (ör. PENDING) 403 alır."
+          },
+          "404": {
+            "description": "Araç bulunamadı."
+          },
+          "409": {
+            "description": "Araç rezerve edilebilir değil VEYA zaten aktif rezervasyonunuz/kiralamanız var."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Araç rezerve et (15 dk ücretsiz tutma)",
+        "tags": [
+          "Reservations"
+        ]
+      }
+    },
+    "/reservations/active": {
+      "get": {
+        "description": "Giriş yapan müşterinin aktif rezervasyonu (kalan saniyeyle). Süresi geçmiş rezervasyon bu çağrıda EXPIRED işlenir ve 404 döner.",
+        "operationId": "ReservationController_getActive",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Aktif rezervasyon yok."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Aktif rezervasyonum",
+        "tags": [
+          "Reservations"
+        ]
+      }
+    },
+    "/reservations/{id}": {
+      "delete": {
+        "description": "Aktif rezervasyonu iptal eder (CANCELLED); araç anında tekrar AVAILABLE olur. Size ait değilse 403, yoksa 404, aktif değilse veya süresi zaten dolmuşsa 409.",
+        "operationId": "ReservationController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "İptal edildi; araç AVAILABLE."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "Rezervasyon bu kullanıcıya ait değil."
+          },
+          "404": {
+            "description": "Rezervasyon bulunamadı."
+          },
+          "409": {
+            "description": "Rezervasyon aktif değil veya süresi zaten dolmuş."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Rezervasyonu iptal et",
+        "tags": [
+          "Reservations"
+        ]
+      }
+    },
+    "/wallet": {
+      "get": {
+        "description": "Giriş yapan müşterinin cüzdanı. Cüzdan ilk erişimde otomatik oluşturulur (0 TL); ayrıca bir \"cüzdan aç\" adımı yoktur. İşlemler yeniden eskiye sıralı son 20 kayıttır.",
+        "operationId": "WalletController_getMine",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Cüzdanım (bakiye + son 20 işlem)",
+        "tags": [
+          "Wallet"
+        ]
+      }
+    },
+    "/wallet/topup": {
+      "post": {
+        "description": "Cüzdana 10-5000 TL aralığında bakiye yükler. SİMÜLASYON: gerçek tahsilat yapılmaz, tutar doğrudan bakiyeye eklenir ve TOPUP hareketi yazılır. Güncel cüzdan (bakiye + son işlemler) döner.",
+        "operationId": "WalletController_topup",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopupDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Yükleme yapıldı; güncel cüzdan cevapta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tutar 10-5000 TL aralığı dışında."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Bakiye yükle (simülasyon)",
+        "tags": [
+          "Wallet"
+        ]
+      }
+    },
+    "/cards": {
+      "get": {
+        "description": "Giriş yapan müşterinin kartları: öntanımlı (default) kart en üstte, gerisi yeniden eskiye.",
+        "operationId": "CardsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CardResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kayıtlı kartlarım",
+        "tags": [
+          "Cards"
+        ]
+      },
+      "post": {
+        "description": "Kart YALNIZ marka + son 4 hane + SKT olarak kaydedilir. Tam kart numarası/CVV alanı YOKTUR ve gönderilirse istek 400 ile reddedilir (PCI kapsamına giren veri hiçbir katmanda kabul edilmez). İlk kart otomatik öntanımlı olur.",
+        "operationId": "CardsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCardDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kart kaydedildi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz gövde (bilinmeyen alan — ör. tam kart numarası —, hatalı last4/SKT, geçmiş son kullanma tarihi)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kart kaydet (yalnız görsel meta — simülasyon)",
+        "tags": [
+          "Cards"
+        ]
+      }
+    },
+    "/cards/{id}/default": {
+      "patch": {
+        "description": "Seçilen kartı öntanımlı yapar; önceki öntanımlının işareti kalkar.",
+        "operationId": "CardsController_setDefault",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Kart öntanımlı yapıldı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Kart bulunamadı (başkasının kartı da \"yok\" sayılır)."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kartı öntanımlı yap",
+        "tags": [
+          "Cards"
+        ]
+      }
+    },
+    "/cards/{id}": {
+      "delete": {
+        "description": "Kartı siler. Silinen kart öntanımlıysa kalan kartların en yenisi öntanımlı olur (müşteri öntanımlısız kalmaz).",
+        "operationId": "CardsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Kart silindi."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "CUSTOMER olmayan kullanıcılar 403 alır."
+          },
+          "404": {
+            "description": "Kart bulunamadı (başkasının kartı da \"yok\" sayılır)."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Kartı sil",
+        "tags": [
+          "Cards"
+        ]
+      }
+    },
+    "/admin/discount-codes": {
+      "post": {
+        "description": "Yeni indirim kodu tanımlar. percentOff (yüzde) VEYA amountOff (sabit TL) alanlarından TAM OLARAK BİRİ verilmelidir. maxUses toplam kullanım limiti (boş = sınırsız); perUserOnce true ise her müşteri kodu bir kez kullanabilir.",
+        "operationId": "AdminDiscountCodeController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDiscountCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Kod oluşturuldu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscountCodeResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Geçersiz gövde (percentOff/amountOff ikisi birden ya da hiçbiri; aralık dışı değerler)."
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          },
+          "409": {
+            "description": "Bu kod zaten mevcut."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "İndirim kodu oluştur",
+        "tags": [
+          "Admin"
+        ]
+      },
+      "get": {
+        "description": "Tüm indirim kodları (yeniden eskiye), kullanım sayaçlarıyla.",
+        "operationId": "AdminDiscountCodeController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DiscountCodeResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token eksik veya geçersiz."
+          },
+          "403": {
+            "description": "ADMIN olmayan kullanıcılar 403 alır."
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "İndirim kodları",
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
     "/admin/locations": {
       "get": {
         "description": "Simülasyondaki tüm araçların O ANKİ konumlarını döner. WebSocket akışı Swagger'da test edilemediği için bu REST snapshot eğitim/test amaçlıdır; WS ile aynı veriyi (tek seferlik) verir.",
@@ -1364,7 +2346,15 @@
     },
     {
       "name": "Rentals",
-      "description": "Müşterinin kiralama oluşturma/iade ve kendi kiralamaları"
+      "description": "Yolculuk: başlatma (kilidi aç), anlık durum, bitirme (ücret dökümü) ve geçmiş"
+    },
+    {
+      "name": "Wallet",
+      "description": "Sanal cüzdan: bakiye, yükleme ve işlem geçmişi (simülasyon)"
+    },
+    {
+      "name": "Cards",
+      "description": "Kayıtlı kartlar (yalnız görsel meta — tam kart verisi alınmaz)"
     }
   ],
   "servers": [],
@@ -1404,6 +2394,11 @@
             "type": "string",
             "description": "Telefon numarası (benzersiz olmalı). Login OTP akışı telefonla başladığından ZORUNLUDUR; telefonsuz kullanıcı giriş yapamaz.",
             "example": "+905551112233"
+          },
+          "referralCode": {
+            "type": "string",
+            "description": "Davet kodu (D6 — \"Davet et · ₺50 kazan\"). Verilirse kayıt davet edene bağlanır; davet edilen İLK yolculuğunu tamamlayınca davet eden 50 TL cüzdan bonusu kazanır. Geçersiz kod 400 döner.",
+            "example": "REN-K7M2XQ"
           }
         },
         "required": [
@@ -1442,6 +2437,12 @@
               "ADMIN"
             ],
             "example": "PENDING"
+          },
+          "referralCode": {
+            "type": "object",
+            "description": "Davet kodu (D6): paylaşınca davet edilen ilk yolculuğunu tamamladığında davet eden 50 TL cüzdan bonusu kazanır. /auth/me çağrısında yoksa üretilir; diğer bağlamlarda null olabilir.",
+            "nullable": true,
+            "example": "REN-K7M2XQ"
           },
           "createdAt": {
             "format": "date-time",
@@ -1582,11 +2583,17 @@
             "type": "string",
             "format": "binary",
             "description": "Ehliyetin ARKA yüz fotoğrafı (jpg/png, maks. 5MB)."
+          },
+          "selfie": {
+            "type": "string",
+            "format": "binary",
+            "description": "Yüz doğrulama selfie'si (jpg/png, maks. 5MB) — D5, yeni başvurularda zorunlu."
           }
         },
         "required": [
           "front",
-          "back"
+          "back",
+          "selfie"
         ]
       },
       "LicenseResponseDto": {
@@ -1613,6 +2620,12 @@
           "backImageUrl": {
             "type": "string",
             "example": "http://localhost:3000/uploads/licenses/back-123.jpg"
+          },
+          "selfieImageUrl": {
+            "type": "object",
+            "description": "Yüz doğrulama selfie'si (D5). Eski (D5 öncesi) kayıtlarda null.",
+            "nullable": true,
+            "example": "http://localhost:3000/uploads/licenses/selfie-123.jpg"
           },
           "rejectReason": {
             "type": "object",
@@ -1709,6 +2722,12 @@
             "type": "string",
             "example": "http://localhost:3000/uploads/licenses/back-123.jpg"
           },
+          "selfieImageUrl": {
+            "type": "object",
+            "description": "Yüz doğrulama selfie'si (D5). Eski (D5 öncesi) kayıtlarda null.",
+            "nullable": true,
+            "example": "http://localhost:3000/uploads/licenses/selfie-123.jpg"
+          },
           "rejectReason": {
             "type": "object",
             "nullable": true
@@ -1789,6 +2808,49 @@
             "description": "Günlük kira ücreti (\u003E 0).",
             "example": 1500
           },
+          "pricePerMinute": {
+            "type": "number",
+            "description": "Dakikalık kira ücreti (\u003E 0).",
+            "example": 4.5
+          },
+          "pricePerHour": {
+            "type": "number",
+            "description": "Saatlik kira ücreti (\u003E 0).",
+            "example": 180
+          },
+          "fuelPercent": {
+            "type": "number",
+            "description": "Yakıt yüzdesi (0..100).",
+            "example": 72
+          },
+          "rangeKm": {
+            "type": "number",
+            "description": "Tahmini menzil, km (0..2000).",
+            "example": 480
+          },
+          "transmission": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "AUTOMATIC"
+            ],
+            "example": "MANUAL"
+          },
+          "seats": {
+            "type": "number",
+            "description": "Koltuk sayısı (2..9).",
+            "example": 5
+          },
+          "segment": {
+            "type": "string",
+            "description": "Fiyat segmenti (müşteri filtre sekmeleri). Karoseri tipi (type) ile karıştırılmamalı; admin belirler.",
+            "enum": [
+              "ECONOMY",
+              "COMFORT",
+              "SUV"
+            ],
+            "example": "ECONOMY"
+          },
           "latitude": {
             "type": "number",
             "description": "Enlem (-90..90).",
@@ -1804,6 +2866,7 @@
             "description": "Başlangıç durumu. Verilmezse AVAILABLE. Aracı doğrudan bakımda oluşturmak için MAINTENANCE kullanılabilir.",
             "enum": [
               "AVAILABLE",
+              "RESERVED",
               "RENTED",
               "MAINTENANCE"
             ],
@@ -1816,6 +2879,13 @@
           "model",
           "type",
           "pricePerDay",
+          "pricePerMinute",
+          "pricePerHour",
+          "fuelPercent",
+          "rangeKm",
+          "transmission",
+          "seats",
+          "segment",
           "latitude",
           "longitude"
         ]
@@ -1854,10 +2924,50 @@
             "type": "number",
             "example": 1500
           },
+          "pricePerMinute": {
+            "type": "number",
+            "example": 4.5
+          },
+          "pricePerHour": {
+            "type": "number",
+            "example": 180
+          },
+          "fuelPercent": {
+            "type": "number",
+            "description": "Yakıt yüzdesi (0..100).",
+            "example": 72
+          },
+          "rangeKm": {
+            "type": "number",
+            "description": "Tahmini menzil (km).",
+            "example": 480
+          },
+          "transmission": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "AUTOMATIC"
+            ],
+            "example": "MANUAL"
+          },
+          "seats": {
+            "type": "number",
+            "example": 5
+          },
+          "segment": {
+            "type": "string",
+            "enum": [
+              "ECONOMY",
+              "COMFORT",
+              "SUV"
+            ],
+            "example": "ECONOMY"
+          },
           "status": {
             "type": "string",
             "enum": [
               "AVAILABLE",
+              "RESERVED",
               "RENTED",
               "MAINTENANCE"
             ],
@@ -1889,6 +2999,13 @@
           "model",
           "type",
           "pricePerDay",
+          "pricePerMinute",
+          "pricePerHour",
+          "fuelPercent",
+          "rangeKm",
+          "transmission",
+          "seats",
+          "segment",
           "status",
           "latitude",
           "longitude",
@@ -1928,6 +3045,49 @@
             "description": "Günlük kira ücreti (\u003E 0).",
             "example": 1500
           },
+          "pricePerMinute": {
+            "type": "number",
+            "description": "Dakikalık kira ücreti (\u003E 0).",
+            "example": 4.5
+          },
+          "pricePerHour": {
+            "type": "number",
+            "description": "Saatlik kira ücreti (\u003E 0).",
+            "example": 180
+          },
+          "fuelPercent": {
+            "type": "number",
+            "description": "Yakıt yüzdesi (0..100).",
+            "example": 72
+          },
+          "rangeKm": {
+            "type": "number",
+            "description": "Tahmini menzil, km (0..2000).",
+            "example": 480
+          },
+          "transmission": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "AUTOMATIC"
+            ],
+            "example": "MANUAL"
+          },
+          "seats": {
+            "type": "number",
+            "description": "Koltuk sayısı (2..9).",
+            "example": 5
+          },
+          "segment": {
+            "type": "string",
+            "description": "Fiyat segmenti (müşteri filtre sekmeleri). Karoseri tipi (type) ile karıştırılmamalı; admin belirler.",
+            "enum": [
+              "ECONOMY",
+              "COMFORT",
+              "SUV"
+            ],
+            "example": "ECONOMY"
+          },
           "latitude": {
             "type": "number",
             "description": "Enlem (-90..90).",
@@ -1943,12 +3103,65 @@
             "description": "Başlangıç durumu. Verilmezse AVAILABLE. Aracı doğrudan bakımda oluşturmak için MAINTENANCE kullanılabilir.",
             "enum": [
               "AVAILABLE",
+              "RESERVED",
               "RENTED",
               "MAINTENANCE"
             ],
             "example": "AVAILABLE"
           }
         }
+      },
+      "QuoteResponseDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "PER_MINUTE",
+              "HOURLY",
+              "DAILY"
+            ],
+            "example": "PER_MINUTE"
+          },
+          "minutes": {
+            "type": "number",
+            "description": "Sorgulanan süre (dakika).",
+            "example": 30
+          },
+          "usageFee": {
+            "type": "number",
+            "description": "Kullanım ücreti kalemi.",
+            "example": 135
+          },
+          "startFee": {
+            "type": "number",
+            "description": "Açılış ücreti (DAILY planda 0).",
+            "example": 15
+          },
+          "serviceFee": {
+            "type": "number",
+            "description": "Servis ücreti (kullanımın yüzdesi; DAILY planda 0).",
+            "example": 7
+          },
+          "estimatedTotal": {
+            "type": "number",
+            "description": "Tahmini toplam.",
+            "example": 157
+          }
+        },
+        "required": [
+          "vehicleId",
+          "plan",
+          "minutes",
+          "usageFee",
+          "startFee",
+          "serviceFee",
+          "estimatedTotal"
+        ]
       },
       "CreateRentalDto": {
         "type": "object",
@@ -1958,16 +3171,65 @@
             "description": "Kiralanacak aracın id'si.",
             "example": "clx0veh1234567890"
           },
+          "plan": {
+            "type": "string",
+            "description": "Kiralama planı. Verilmezse DAILY varsayılır (geriye uyum).",
+            "enum": [
+              "PER_MINUTE",
+              "HOURLY",
+              "DAILY"
+            ],
+            "default": "DAILY",
+            "example": "PER_MINUTE"
+          },
           "endDate": {
             "type": "string",
-            "description": "Planlanan iade tarihi. Şu andan ileri olmalı (gün hesabı buna göre).",
-            "example": "2026-07-05T10:00:00.000Z",
+            "description": "Planlanan iade tarihi — YALNIZ DAILY planda (zorunlu). Şu andan ileri olmalı; gün hesabı buna göre yapılır.",
+            "example": "2026-07-15T10:00:00.000Z",
             "format": "date-time"
           }
         },
         "required": [
-          "vehicleId",
-          "endDate"
+          "vehicleId"
+        ]
+      },
+      "RentalVehicleSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "plate": {
+            "type": "string",
+            "example": "34 ABC 123"
+          },
+          "brand": {
+            "type": "string",
+            "example": "Volkswagen"
+          },
+          "model": {
+            "type": "string",
+            "example": "Passat"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SEDAN",
+              "SUV",
+              "HATCHBACK",
+              "STATION",
+              "MINIVAN"
+            ],
+            "example": "SEDAN"
+          }
+        },
+        "required": [
+          "id",
+          "plate",
+          "brand",
+          "model",
+          "type"
         ]
       },
       "RentalResponseDto": {
@@ -1985,45 +3247,689 @@
             "type": "string",
             "example": "clx0veh1234567890"
           },
-          "startDate": {
+          "vehicle": {
+            "$ref": "#/components/schemas/RentalVehicleSummaryDto"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "PER_MINUTE",
+              "HOURLY",
+              "DAILY"
+            ],
+            "example": "PER_MINUTE"
+          },
+          "startedAt": {
             "format": "date-time",
             "type": "string",
-            "example": "2026-06-30T12:00:00.000Z"
+            "description": "Yolculuğun başladığı an (\"kilidi aç\").",
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "endedAt": {
+            "type": "object",
+            "description": "Gerçek bitiş anı; yolculuk sürerken null.",
+            "example": "2026-07-11T12:47:00.000Z",
+            "nullable": true
           },
           "endDate": {
-            "format": "date-time",
-            "type": "string",
-            "example": "2026-07-05T10:00:00.000Z"
+            "type": "object",
+            "description": "Planlanan iade tarihi — YALNIZ DAILY planda dolu.",
+            "example": null,
+            "nullable": true
           },
           "totalPrice": {
+            "type": "object",
+            "description": "Toplam ücret. DAILY: oluştururken kilitlenir. PER_MINUTE/HOURLY: finish'e kadar null, sonra kalem kalem hesaplanıp kilitlenir.",
+            "example": 156.5,
+            "nullable": true
+          },
+          "startFee": {
             "type": "number",
-            "description": "Oluştururken kilitlenen toplam ücret (gün * pricePerDay).",
-            "example": 7500
+            "description": "Açılış ücreti (oluştururken kilitlenir; DAILY planda 0).",
+            "example": 15
+          },
+          "serviceFee": {
+            "type": "object",
+            "description": "Servis ücreti (kullanımın yüzdesi, finish'te hesaplanır; DAILY'de null).",
+            "example": 6.5,
+            "nullable": true
+          },
+          "distanceKm": {
+            "type": "number",
+            "description": "Yolculuk boyunca biriken mesafe (km, sim telemetrisi).",
+            "example": 12.4
+          },
+          "durationMinutes": {
+            "type": "number",
+            "description": "Yolculuk süresi (dakika, yukarı yuvarlı) — TÜRETİLMİŞ alan (D6). ACTIVE'de now'a kadar canlı; PREPARING ve başlamadan iptal edilmiş kayıtlarda 0.",
+            "example": 47
           },
           "status": {
             "type": "string",
             "enum": [
+              "PREPARING",
               "ACTIVE",
               "COMPLETED",
               "CANCELLED"
             ],
             "example": "ACTIVE"
           },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID"
+            ],
+            "description": "Ödeme durumu. Yolculuk bitince UNPAID kalır; POST /rentals/:id/pay ile PAID olur.",
+            "example": "UNPAID"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "WALLET",
+              "CARD"
+            ],
+            "description": "Ödeme yöntemi — yalnız ödeme alındıysa dolu.",
+            "example": null,
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "Ödemede uygulanan indirim (TL); kod kullanılmadıysa 0.",
+            "example": 0
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string",
-            "example": "2026-06-30T12:00:00.000Z"
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "startDate": {
+            "format": "date-time",
+            "type": "string",
+            "description": "KULLANMAYIN — startedAt'in eski adı. Canlıdaki eski istemci (Android 0.3.0) bu alanı okuduğu için geriye uyum amacıyla korunur; DF3 yayınlandıktan sonra kaldırılabilir.",
+            "example": "2026-07-11T12:00:00.000Z",
+            "deprecated": true
           }
         },
         "required": [
           "id",
           "userId",
           "vehicleId",
-          "startDate",
+          "vehicle",
+          "plan",
+          "startedAt",
+          "endedAt",
           "endDate",
           "totalPrice",
+          "startFee",
+          "serviceFee",
+          "distanceKm",
+          "durationMinutes",
           "status",
+          "paymentStatus",
+          "paymentMethod",
+          "discountAmount",
+          "createdAt",
+          "startDate"
+        ]
+      },
+      "RentalStatsResponseDto": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "İstatistiğin ayı (YYYY-MM, UTC).",
+            "example": "2026-07"
+          },
+          "tripCount": {
+            "type": "number",
+            "description": "Ay içinde TAMAMLANAN yolculuk sayısı.",
+            "example": 6
+          },
+          "totalSpent": {
+            "type": "number",
+            "description": "Ay içindeki toplam harcama (TL): ÖDENMİŞ (PAID) yolculukların indirim sonrası tutarları. Henüz ödenmemiş yolculuklar harcama sayılmaz.",
+            "example": 612
+          },
+          "totalMinutes": {
+            "type": "number",
+            "description": "Toplam yolculuk süresi (dakika).",
+            "example": 184
+          },
+          "totalKm": {
+            "type": "number",
+            "description": "Toplam mesafe (km, sim telemetrisi).",
+            "example": 96.4
+          }
+        },
+        "required": [
+          "month",
+          "tripCount",
+          "totalSpent",
+          "totalMinutes",
+          "totalKm"
+        ]
+      },
+      "ActiveRentalResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0rent1234567890"
+          },
+          "userId": {
+            "type": "string",
+            "example": "clx0usr1234567890"
+          },
+          "vehicleId": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "vehicle": {
+            "$ref": "#/components/schemas/RentalVehicleSummaryDto"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "PER_MINUTE",
+              "HOURLY",
+              "DAILY"
+            ],
+            "example": "PER_MINUTE"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Yolculuğun başladığı an (\"kilidi aç\").",
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "endedAt": {
+            "type": "object",
+            "description": "Gerçek bitiş anı; yolculuk sürerken null.",
+            "example": "2026-07-11T12:47:00.000Z",
+            "nullable": true
+          },
+          "endDate": {
+            "type": "object",
+            "description": "Planlanan iade tarihi — YALNIZ DAILY planda dolu.",
+            "example": null,
+            "nullable": true
+          },
+          "totalPrice": {
+            "type": "object",
+            "description": "Toplam ücret. DAILY: oluştururken kilitlenir. PER_MINUTE/HOURLY: finish'e kadar null, sonra kalem kalem hesaplanıp kilitlenir.",
+            "example": 156.5,
+            "nullable": true
+          },
+          "startFee": {
+            "type": "number",
+            "description": "Açılış ücreti (oluştururken kilitlenir; DAILY planda 0).",
+            "example": 15
+          },
+          "serviceFee": {
+            "type": "object",
+            "description": "Servis ücreti (kullanımın yüzdesi, finish'te hesaplanır; DAILY'de null).",
+            "example": 6.5,
+            "nullable": true
+          },
+          "distanceKm": {
+            "type": "number",
+            "description": "Yolculuk boyunca biriken mesafe (km, sim telemetrisi).",
+            "example": 12.4
+          },
+          "durationMinutes": {
+            "type": "number",
+            "description": "Yolculuk süresi (dakika, yukarı yuvarlı) — TÜRETİLMİŞ alan (D6). ACTIVE'de now'a kadar canlı; PREPARING ve başlamadan iptal edilmiş kayıtlarda 0.",
+            "example": 47
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PREPARING",
+              "ACTIVE",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "example": "ACTIVE"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID"
+            ],
+            "description": "Ödeme durumu. Yolculuk bitince UNPAID kalır; POST /rentals/:id/pay ile PAID olur.",
+            "example": "UNPAID"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "WALLET",
+              "CARD"
+            ],
+            "description": "Ödeme yöntemi — yalnız ödeme alındıysa dolu.",
+            "example": null,
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "Ödemede uygulanan indirim (TL); kod kullanılmadıysa 0.",
+            "example": 0
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "startDate": {
+            "format": "date-time",
+            "type": "string",
+            "description": "KULLANMAYIN — startedAt'in eski adı. Canlıdaki eski istemci (Android 0.3.0) bu alanı okuduğu için geriye uyum amacıyla korunur; DF3 yayınlandıktan sonra kaldırılabilir.",
+            "example": "2026-07-11T12:00:00.000Z",
+            "deprecated": true
+          },
+          "elapsedSeconds": {
+            "type": "number",
+            "description": "Yolculuk başlangıcından bu yana geçen süre (saniye).",
+            "example": 1264
+          },
+          "currentCost": {
+            "type": "number",
+            "description": "Yolculuk ŞU AN bitirilse ödenecek tahmini tutar (kullanım + açılış + servis ücreti). DAILY planda baştan kilitlenen fiyata eşittir.",
+            "example": 156.5
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "vehicleId",
+          "vehicle",
+          "plan",
+          "startedAt",
+          "endedAt",
+          "endDate",
+          "totalPrice",
+          "startFee",
+          "serviceFee",
+          "distanceKm",
+          "durationMinutes",
+          "status",
+          "paymentStatus",
+          "paymentMethod",
+          "discountAmount",
+          "createdAt",
+          "startDate",
+          "elapsedSeconds",
+          "currentCost"
+        ]
+      },
+      "UploadRentalPhotoDto": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "FRONT",
+              "BACK",
+              "LEFT",
+              "RIGHT"
+            ],
+            "description": "Fotoğrafın yönü. Aynı yöne ikinci yükleme ÖNCEKİNİ değiştirir.",
+            "example": "FRONT"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "description": "Araç fotoğrafı (jpg/png, maks. 5MB)."
+          }
+        },
+        "required": [
+          "side",
+          "file"
+        ]
+      },
+      "RentalPhotoDto": {
+        "type": "object",
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "FRONT",
+              "BACK",
+              "LEFT",
+              "RIGHT"
+            ],
+            "example": "FRONT"
+          },
+          "imageUrl": {
+            "type": "string",
+            "example": "http://localhost:3000/uploads/rental-photos/file-123.jpg"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "side",
+          "imageUrl",
           "createdAt"
+        ]
+      },
+      "RentalPhotosStateDto": {
+        "type": "object",
+        "properties": {
+          "rentalId": {
+            "type": "string",
+            "example": "clx0rent1234567890"
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RentalPhotoDto"
+            }
+          },
+          "uploadedCount": {
+            "type": "number",
+            "description": "Yüklenen yön sayısı (0-4).",
+            "example": 2
+          },
+          "remainingSides": {
+            "type": "array",
+            "description": "Eksik yönlerin listesi.",
+            "example": [
+              "LEFT",
+              "RIGHT"
+            ],
+            "items": {
+              "type": "string",
+              "enum": [
+                "FRONT",
+                "BACK",
+                "LEFT",
+                "RIGHT"
+              ]
+            }
+          },
+          "photosComplete": {
+            "type": "boolean",
+            "description": "4 yönün tamamı yüklendi mi (start için önkoşul).",
+            "example": false
+          }
+        },
+        "required": [
+          "rentalId",
+          "photos",
+          "uploadedCount",
+          "remainingSides",
+          "photosComplete"
+        ]
+      },
+      "FinishRentalResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0rent1234567890"
+          },
+          "userId": {
+            "type": "string",
+            "example": "clx0usr1234567890"
+          },
+          "vehicleId": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "vehicle": {
+            "$ref": "#/components/schemas/RentalVehicleSummaryDto"
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "PER_MINUTE",
+              "HOURLY",
+              "DAILY"
+            ],
+            "example": "PER_MINUTE"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Yolculuğun başladığı an (\"kilidi aç\").",
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "endedAt": {
+            "type": "object",
+            "description": "Gerçek bitiş anı; yolculuk sürerken null.",
+            "example": "2026-07-11T12:47:00.000Z",
+            "nullable": true
+          },
+          "endDate": {
+            "type": "object",
+            "description": "Planlanan iade tarihi — YALNIZ DAILY planda dolu.",
+            "example": null,
+            "nullable": true
+          },
+          "totalPrice": {
+            "type": "object",
+            "description": "Toplam ücret. DAILY: oluştururken kilitlenir. PER_MINUTE/HOURLY: finish'e kadar null, sonra kalem kalem hesaplanıp kilitlenir.",
+            "example": 156.5,
+            "nullable": true
+          },
+          "startFee": {
+            "type": "number",
+            "description": "Açılış ücreti (oluştururken kilitlenir; DAILY planda 0).",
+            "example": 15
+          },
+          "serviceFee": {
+            "type": "object",
+            "description": "Servis ücreti (kullanımın yüzdesi, finish'te hesaplanır; DAILY'de null).",
+            "example": 6.5,
+            "nullable": true
+          },
+          "distanceKm": {
+            "type": "number",
+            "description": "Yolculuk boyunca biriken mesafe (km, sim telemetrisi).",
+            "example": 12.4
+          },
+          "durationMinutes": {
+            "type": "number",
+            "description": "Yolculuk süresi (dakika, yukarı yuvarlı) — TÜRETİLMİŞ alan (D6). ACTIVE'de now'a kadar canlı; PREPARING ve başlamadan iptal edilmiş kayıtlarda 0.",
+            "example": 47
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PREPARING",
+              "ACTIVE",
+              "COMPLETED",
+              "CANCELLED"
+            ],
+            "example": "ACTIVE"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID"
+            ],
+            "description": "Ödeme durumu. Yolculuk bitince UNPAID kalır; POST /rentals/:id/pay ile PAID olur.",
+            "example": "UNPAID"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "WALLET",
+              "CARD"
+            ],
+            "description": "Ödeme yöntemi — yalnız ödeme alındıysa dolu.",
+            "example": null,
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "Ödemede uygulanan indirim (TL); kod kullanılmadıysa 0.",
+            "example": 0
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "startDate": {
+            "format": "date-time",
+            "type": "string",
+            "description": "KULLANMAYIN — startedAt'in eski adı. Canlıdaki eski istemci (Android 0.3.0) bu alanı okuduğu için geriye uyum amacıyla korunur; DF3 yayınlandıktan sonra kaldırılabilir.",
+            "example": "2026-07-11T12:00:00.000Z",
+            "deprecated": true
+          },
+          "usageFee": {
+            "type": "number",
+            "description": "Kullanım ücreti: PER_MINUTE ceil(saniye/60)*pricePerMinute, HOURLY ceil(dakika/60)*pricePerHour, DAILY kilitli günlük fiyatın kendisi.",
+            "example": 135
+          },
+          "elapsedSeconds": {
+            "type": "number",
+            "description": "Yolculuğun toplam süresi (saniye).",
+            "example": 1800
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "vehicleId",
+          "vehicle",
+          "plan",
+          "startedAt",
+          "endedAt",
+          "endDate",
+          "totalPrice",
+          "startFee",
+          "serviceFee",
+          "distanceKm",
+          "durationMinutes",
+          "status",
+          "paymentStatus",
+          "paymentMethod",
+          "discountAmount",
+          "createdAt",
+          "startDate",
+          "usageFee",
+          "elapsedSeconds"
+        ]
+      },
+      "PayRentalDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "WALLET",
+              "CARD"
+            ],
+            "example": "WALLET"
+          },
+          "cardId": {
+            "type": "string",
+            "description": "Kayıtlı kartın id'si — YALNIZ CARD yönteminde (zorunlu).",
+            "example": "clx0card1234567890"
+          },
+          "discountCode": {
+            "type": "string",
+            "description": "İndirim kodu (varsa).",
+            "example": "İLKSÜRÜŞ"
+          }
+        },
+        "required": [
+          "method"
+        ]
+      },
+      "PaidCardSummaryDto": {
+        "type": "object",
+        "properties": {
+          "brand": {
+            "type": "string",
+            "enum": [
+              "VISA",
+              "MASTERCARD"
+            ],
+            "example": "VISA"
+          },
+          "last4": {
+            "type": "string",
+            "example": "4291"
+          }
+        },
+        "required": [
+          "brand",
+          "last4"
+        ]
+      },
+      "PayRentalResponseDto": {
+        "type": "object",
+        "properties": {
+          "rentalId": {
+            "type": "string",
+            "example": "clx0rent1234567890"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID"
+            ],
+            "example": "PAID"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "WALLET",
+              "CARD"
+            ],
+            "example": "WALLET"
+          },
+          "totalPrice": {
+            "type": "number",
+            "description": "Yolculuğun kilitli toplam ücreti (indirim öncesi).",
+            "example": 156.5
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "Uygulanan indirim (TL); kod yoksa 0.",
+            "example": 20
+          },
+          "paidAmount": {
+            "type": "number",
+            "description": "Fiilen ödenen tutar: max(0, totalPrice - discountAmount).",
+            "example": 136.5
+          },
+          "walletBalance": {
+            "type": "object",
+            "description": "Ödeme sonrası cüzdan bakiyesi — YALNIZ WALLET yönteminde.",
+            "example": 203.5,
+            "nullable": true
+          },
+          "card": {
+            "description": "Kullanılan kart özeti — YALNIZ CARD yönteminde.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaidCardSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "rentalId",
+          "paymentStatus",
+          "method",
+          "totalPrice",
+          "discountAmount",
+          "paidAmount",
+          "walletBalance",
+          "card"
         ]
       },
       "RentalUserSummary": {
@@ -2087,33 +3993,91 @@
             "type": "string",
             "example": "clx0rent1234567890"
           },
-          "startDate": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "PER_MINUTE",
+              "HOURLY",
+              "DAILY"
+            ],
+            "example": "PER_MINUTE"
+          },
+          "startedAt": {
             "format": "date-time",
             "type": "string",
-            "example": "2026-06-30T12:00:00.000Z"
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "endedAt": {
+            "type": "object",
+            "example": "2026-07-11T12:47:00.000Z",
+            "nullable": true
           },
           "endDate": {
-            "format": "date-time",
-            "type": "string",
-            "example": "2026-07-05T10:00:00.000Z"
+            "type": "object",
+            "description": "Planlanan iade — yalnız DAILY planda dolu.",
+            "example": null,
+            "nullable": true
           },
           "totalPrice": {
+            "type": "object",
+            "example": 156.5,
+            "nullable": true
+          },
+          "startFee": {
             "type": "number",
-            "example": 7500
+            "example": 15
+          },
+          "serviceFee": {
+            "type": "object",
+            "example": 6.5,
+            "nullable": true
+          },
+          "distanceKm": {
+            "type": "number",
+            "example": 12.4
           },
           "status": {
             "type": "string",
             "enum": [
+              "PREPARING",
               "ACTIVE",
               "COMPLETED",
               "CANCELLED"
             ],
             "example": "ACTIVE"
           },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PAID"
+            ],
+            "example": "UNPAID"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "WALLET",
+              "CARD"
+            ],
+            "example": null,
+            "nullable": true
+          },
+          "discountAmount": {
+            "type": "number",
+            "example": 0
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string",
-            "example": "2026-06-30T12:00:00.000Z"
+            "example": "2026-07-11T12:00:00.000Z"
+          },
+          "startDate": {
+            "format": "date-time",
+            "type": "string",
+            "description": "KULLANMAYIN — startedAt'in eski adı (geriye uyum).",
+            "example": "2026-07-11T12:00:00.000Z",
+            "deprecated": true
           },
           "user": {
             "$ref": "#/components/schemas/RentalUserSummary"
@@ -2124,13 +4088,398 @@
         },
         "required": [
           "id",
-          "startDate",
+          "plan",
+          "startedAt",
+          "endedAt",
           "endDate",
           "totalPrice",
+          "startFee",
+          "serviceFee",
+          "distanceKm",
           "status",
+          "paymentStatus",
+          "paymentMethod",
+          "discountAmount",
           "createdAt",
+          "startDate",
           "user",
           "vehicle"
+        ]
+      },
+      "CreateReservationDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "string",
+            "description": "Rezerve edilecek aracın id'si.",
+            "example": "clx0veh1234567890"
+          }
+        },
+        "required": [
+          "vehicleId"
+        ]
+      },
+      "ReservationVehicleSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "plate": {
+            "type": "string",
+            "example": "34 ABC 123"
+          },
+          "brand": {
+            "type": "string",
+            "example": "Renault"
+          },
+          "model": {
+            "type": "string",
+            "example": "Clio"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "SEDAN",
+              "SUV",
+              "HATCHBACK",
+              "STATION",
+              "MINIVAN"
+            ],
+            "example": "HATCHBACK"
+          },
+          "latitude": {
+            "type": "number",
+            "example": 41.0369
+          },
+          "longitude": {
+            "type": "number",
+            "example": 28.985
+          },
+          "pricePerMinute": {
+            "type": "number",
+            "example": 4.5
+          }
+        },
+        "required": [
+          "id",
+          "plate",
+          "brand",
+          "model",
+          "type",
+          "latitude",
+          "longitude",
+          "pricePerMinute"
+        ]
+      },
+      "ReservationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0resv1234567890"
+          },
+          "userId": {
+            "type": "string",
+            "example": "clx0usr1234567890"
+          },
+          "vehicleId": {
+            "type": "string",
+            "example": "clx0veh1234567890"
+          },
+          "vehicle": {
+            "$ref": "#/components/schemas/ReservationVehicleSummaryDto"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "CONVERTED",
+              "CANCELLED",
+              "EXPIRED"
+            ],
+            "example": "ACTIVE"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:15:00.000Z"
+          },
+          "remainingSeconds": {
+            "type": "number",
+            "description": "Sürenin dolmasına kalan saniye (0 tabanlı, negatif olmaz).",
+            "example": 842
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "vehicleId",
+          "vehicle",
+          "status",
+          "expiresAt",
+          "remainingSeconds",
+          "createdAt"
+        ]
+      },
+      "WalletTransactionDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0wtx1234567890"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TOPUP",
+              "RENTAL_PAYMENT",
+              "REFERRAL_BONUS"
+            ],
+            "example": "TOPUP"
+          },
+          "amount": {
+            "type": "number",
+            "description": "İşaretli tutar (TL): yükleme/bonus +, ödeme -.",
+            "example": 200
+          },
+          "rentalId": {
+            "type": "object",
+            "description": "Ödeme hareketiyse ilgili kiralamanın id'si.",
+            "example": null,
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "example": "Bakiye yükleme"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "amount",
+          "rentalId",
+          "description",
+          "createdAt"
+        ]
+      },
+      "WalletResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0wal1234567890"
+          },
+          "balance": {
+            "type": "number",
+            "description": "Güncel bakiye (TL).",
+            "example": 340
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletTransactionDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "balance",
+          "transactions"
+        ]
+      },
+      "TopupDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "description": "Yüklenecek tutar (TL). 10-5000 aralığında olmalı.",
+            "example": 200,
+            "minimum": 10,
+            "maximum": 5000
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "CardResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0card1234567890"
+          },
+          "brand": {
+            "type": "string",
+            "enum": [
+              "VISA",
+              "MASTERCARD"
+            ],
+            "example": "VISA"
+          },
+          "last4": {
+            "type": "string",
+            "example": "4291"
+          },
+          "expMonth": {
+            "type": "number",
+            "example": 8
+          },
+          "expYear": {
+            "type": "number",
+            "example": 2028
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Ödemede öntanımlı gösterilecek kart.",
+            "example": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "brand",
+          "last4",
+          "expMonth",
+          "expYear",
+          "isDefault",
+          "createdAt"
+        ]
+      },
+      "CreateCardDto": {
+        "type": "object",
+        "properties": {
+          "brand": {
+            "type": "string",
+            "enum": [
+              "VISA",
+              "MASTERCARD"
+            ],
+            "example": "VISA"
+          },
+          "last4": {
+            "type": "string",
+            "description": "Kart numarasının YALNIZ son 4 hanesi.",
+            "example": "4291"
+          },
+          "expMonth": {
+            "type": "number",
+            "description": "Son kullanma ayı (1-12).",
+            "example": 8
+          },
+          "expYear": {
+            "type": "number",
+            "description": "Son kullanma yılı (4 hane).",
+            "example": 2028
+          }
+        },
+        "required": [
+          "brand",
+          "last4",
+          "expMonth",
+          "expYear"
+        ]
+      },
+      "CreateDiscountCodeDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Kod (müşterinin gireceği metin; benzersiz).",
+            "example": "İLKSÜRÜŞ"
+          },
+          "percentOff": {
+            "type": "number",
+            "description": "Yüzde indirim (1-100). amountOff ile birlikte VERİLEMEZ.",
+            "example": null
+          },
+          "amountOff": {
+            "type": "number",
+            "description": "Sabit indirim (TL). percentOff ile birlikte VERİLEMEZ.",
+            "example": 20
+          },
+          "maxUses": {
+            "type": "number",
+            "description": "Toplam kullanım limiti. Verilmezse sınırsız.",
+            "example": null
+          },
+          "perUserOnce": {
+            "type": "boolean",
+            "description": "true ise her kullanıcı kodu yalnız BİR kez kullanabilir.",
+            "default": false,
+            "example": true
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
+      "DiscountCodeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clx0disc1234567890"
+          },
+          "code": {
+            "type": "string",
+            "example": "İLKSÜRÜŞ"
+          },
+          "percentOff": {
+            "type": "object",
+            "example": null,
+            "nullable": true
+          },
+          "amountOff": {
+            "type": "object",
+            "example": 20,
+            "nullable": true
+          },
+          "maxUses": {
+            "type": "object",
+            "description": "Toplam kullanım limiti; null = sınırsız.",
+            "example": null,
+            "nullable": true
+          },
+          "usedCount": {
+            "type": "number",
+            "example": 3
+          },
+          "perUserOnce": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "example": "2026-07-11T12:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "percentOff",
+          "amountOff",
+          "maxUses",
+          "usedCount",
+          "perUserOnce",
+          "createdAt"
         ]
       },
       "VehiclePositionDto": {
@@ -2148,6 +4497,7 @@
             "type": "string",
             "enum": [
               "AVAILABLE",
+              "RESERVED",
               "RENTED",
               "MAINTENANCE"
             ],

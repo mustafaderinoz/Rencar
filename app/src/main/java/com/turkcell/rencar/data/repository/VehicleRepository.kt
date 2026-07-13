@@ -20,4 +20,11 @@ class VehicleRepository @Inject constructor(
      */
     suspend fun getAvailableVehicles(type: String? = null): Result<List<VehicleResponse>> =
         runCatching { vehicleApi.list(type = type) }
+
+    /**
+     * Tek aracın detayını getirir (araç detay ekranı). Görünmeyen/olmayan araç için API 404
+     * döndürür; hata Result olarak çağırana (ViewModel) taşınır.
+     */
+    suspend fun getVehicle(id: String): Result<VehicleResponse> =
+        runCatching { vehicleApi.getOne(id) }
 }

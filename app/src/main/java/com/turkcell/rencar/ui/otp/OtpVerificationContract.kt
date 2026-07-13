@@ -13,9 +13,17 @@ data class OtpVerificationUiState(
     val errorMessage: String? = null,
     /** POST /auth/verify-otp başarılı → geçiş sinyali (§4.6: Effect yerine state bayrağı). */
     val verified: Boolean = false,
-    /** Kullanıcı PENDING ise ehliyet doğrulama akışına, değilse Home'a yönlendirilir. */
-    val needsLicenseVerification: Boolean = false,
+    /** Doğrulama sonrası gidilecek hedef; yalnızca [verified] true iken anlamlıdır. */
+    val destination: PostVerifyDestination = PostVerifyDestination.HOME,
 )
+
+/**
+ * OTP doğrulaması sonrası kullanıcının yönlendirileceği hedef (rol + ehliyet durumuna göre).
+ * - [HOME]: onaylı kullanıcı (CUSTOMER/ADMIN) veya ehliyeti APPROVED.
+ * - [LICENSE_UPLOAD]: PENDING + ehliyet yüklenmemiş/reddedilmiş (NOT_SUBMITTED/REJECTED).
+ * - [LICENSE_PENDING]: PENDING + ehliyet incelemede (UNDER_REVIEW) → engelleyici bekleme ekranı.
+ */
+enum class PostVerifyDestination { HOME, LICENSE_UPLOAD, LICENSE_PENDING }
 
 /**
  * Kullanıcı aksiyonları (§4.3): parametreli -> data class, parametresiz -> data object.
