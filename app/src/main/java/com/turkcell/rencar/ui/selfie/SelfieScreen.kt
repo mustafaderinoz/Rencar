@@ -82,7 +82,7 @@ private val RencarBlue = LightPrimary
 @Composable
 fun SelfieScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToHome: () -> Unit,
+    onNavigateToPending: () -> Unit,
     viewModel: SelfieViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,7 +112,8 @@ fun SelfieScreen(
         onRetry = { viewModel.onIntent(SelfieIntent.RetryClicked) },
         onDone = {
             viewModel.onIntent(SelfieIntent.DoneClicked)
-            onNavigateToHome()
+            // Yükleme başarılı → ehliyet artık UNDER_REVIEW; kullanıcı bekleme ekranına kilitlenir.
+            onNavigateToPending()
         },
         onGrantPermission = { requestCamera.launch(Manifest.permission.CAMERA) },
     )

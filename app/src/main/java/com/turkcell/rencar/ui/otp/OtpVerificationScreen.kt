@@ -67,14 +67,19 @@ fun OtpVerificationScreen(
     onNavigateBack: () -> Unit,
     onNavigateToHome: () -> Unit,
     onNavigateToLicense: () -> Unit,
+    onNavigateToLicensePending: () -> Unit,
     viewModel: OtpVerificationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // POST /auth/verify-otp başarılı → PENDING ise ehliyet akışı, değilse Home; bayrağı tüket.
+    // POST /auth/verify-otp başarılı → role + ehliyet durumuna göre hedefe git; bayrağı tüket.
     LaunchedEffect(uiState.verified) {
         if (uiState.verified) {
-            if (uiState.needsLicenseVerification) onNavigateToLicense() else onNavigateToHome()
+            when (uiState.destination) {
+                PostVerifyDestination.HOME -> onNavigateToHome()
+                PostVerifyDestination.LICENSE_UPLOAD -> onNavigateToLicense()
+                PostVerifyDestination.LICENSE_PENDING -> onNavigateToLicensePending()
+            }
             viewModel.onVerifiedHandled()
         }
     }

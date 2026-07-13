@@ -24,3 +24,18 @@ data class LicenseResponse(
     val createdAt: String,
     val updatedAt: String,
 )
+
+/**
+ * GET /license/status 200 yanıtı (LicenseStatusResponseDto).
+ * status: NOT_SUBMITTED (hiç yükleme yok) | UNDER_REVIEW (admin onayı bekliyor) |
+ * APPROVED (onaylı, rol CUSTOMER) | REJECTED (reddedildi, rejectReason dolu).
+ * Diğer alanlar NOT_SUBMITTED iken null olabilir (explicitNulls=false ile atlanır).
+ */
+@Serializable
+data class LicenseStatusResponse(
+    val status: String,
+    val frontImageUrl: String? = null,
+    val backImageUrl: String? = null,
+    val rejectReason: String? = null,
+    val reviewedAt: String? = null,
+)

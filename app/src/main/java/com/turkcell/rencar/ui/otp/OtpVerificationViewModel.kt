@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.repository.AuthRepository
+import com.turkcell.rencar.data.repository.LicenseRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.IOException
@@ -21,6 +22,7 @@ import retrofit2.HttpException
 class OtpVerificationViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val authRepository: AuthRepository,
+    private val licenseRepository: LicenseRepository,
 ) : ViewModel() {
 
     // Login → OTP geçişinde iletilen numara (10 haneli, path argümanı).
@@ -82,19 +84,35 @@ class OtpVerificationViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.verifyOtp(phone = e164Phone, code = state.otpCode)
                 .onSuccess { auth ->
-                    // PENDING kullanıcı ehliyet doğrulamaya, onaylı roller doğrudan Home'a gider.
-                    val needsLicense = auth.user.role == "PENDING"
+                    val destination = resolveDestination(auth.user.role)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             verified = true,
-                            needsLicenseVerification = needsLicense,
+                            destination = destination,
                         )
                     }
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
                 }
+        }
+    }
+
+    /**
+     * OTP doğrulaması sonrası gidilecek hedefi belirler. Onaylı roller (CUSTOMER/ADMIN) doğrudan
+     * Home'a gider. PENDING kullanıcıda GET /license/status'a bakılır:
+     * - UNDER_REVIEW → [PostVerifyDestination.LICENSE_PENDING] (engelleyici bekleme ekranı)
+     * - APPROVED → [PostVerifyDestination.HOME]
+     * - NOT_SUBMITTED / REJECTED / durum alınamadı → [PostVerifyDestination.LICENSE_UPLOAD]
+     * (Durum alınamazsa güvenli varsayılan: kullanıcı ehliyet yükleyebilsin diye yükleme ekranı.)
+     */
+    private suspend fun resolveDestination(role: String): PostVerifyDestination {
+        if (role != "PENDING") return PostVerifyDestination.HOME
+        return when (licenseRepository.getStatus().getOrNull()?.status) {
+            "UNDER_REVIEW" -> PostVerifyDestination.LICENSE_PENDING
+            "APPROVED" -> PostVerifyDestination.HOME
+            else -> PostVerifyDestination.LICENSE_UPLOAD
         }
     }
 
