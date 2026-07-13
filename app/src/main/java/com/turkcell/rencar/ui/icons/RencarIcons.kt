@@ -436,6 +436,171 @@ object RencarIcons {
         }.build()
     }
 
+    /** Yakıt pompası — araç detay "Yakıt" kartı. */
+    val Fuel: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarFuel",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(19.77f, 7.23f)
+                lineToRelative(0.01f, -0.01f)
+                lineToRelative(-3.72f, -3.72f)
+                lineTo(15f, 4.56f)
+                lineToRelative(2.11f, 2.11f)
+                curveToRelative(-0.94f, 0.36f, -1.61f, 1.26f, -1.61f, 2.33f)
+                curveToRelative(0f, 1.38f, 1.12f, 2.5f, 2.5f, 2.5f)
+                curveToRelative(0.36f, 0f, 0.69f, -0.08f, 1f, -0.21f)
+                verticalLineToRelative(7.21f)
+                curveToRelative(0f, 0.55f, -0.45f, 1f, -1f, 1f)
+                reflectiveCurveToRelative(-1f, -0.45f, -1f, -1f)
+                verticalLineTo(14f)
+                curveToRelative(0f, -1.1f, -0.9f, -2f, -2f, -2f)
+                horizontalLineToRelative(-1f)
+                verticalLineTo(5f)
+                curveToRelative(0f, -1.1f, -0.9f, -2f, -2f, -2f)
+                horizontalLineTo(6f)
+                curveToRelative(-1.1f, 0f, -2f, 0.9f, -2f, 2f)
+                verticalLineToRelative(16f)
+                horizontalLineToRelative(10f)
+                verticalLineToRelative(-7.5f)
+                horizontalLineToRelative(1.5f)
+                verticalLineToRelative(5f)
+                curveToRelative(0f, 1.38f, 1.12f, 2.5f, 2.5f, 2.5f)
+                reflectiveCurveToRelative(2.5f, -1.12f, 2.5f, -2.5f)
+                verticalLineTo(9f)
+                curveToRelative(0f, -0.69f, -0.28f, -1.32f, -0.73f, -1.77f)
+                close()
+                moveTo(12f, 10f)
+                horizontalLineTo(6f)
+                verticalLineTo(5f)
+                horizontalLineToRelative(6f)
+                verticalLineToRelative(5f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Dişli/çark — araç detay "Vites" kartı (mekanik). */
+    val Gear: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarGear",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(19.14f, 12.94f)
+                curveToRelative(0.04f, -0.3f, 0.06f, -0.61f, 0.06f, -0.94f)
+                curveToRelative(0f, -0.32f, -0.02f, -0.64f, -0.07f, -0.94f)
+                lineToRelative(2.03f, -1.58f)
+                curveToRelative(0.18f, -0.14f, 0.23f, -0.41f, 0.12f, -0.61f)
+                lineToRelative(-1.92f, -3.32f)
+                curveToRelative(-0.12f, -0.22f, -0.37f, -0.29f, -0.59f, -0.22f)
+                lineToRelative(-2.39f, 0.96f)
+                curveToRelative(-0.5f, -0.38f, -1.03f, -0.7f, -1.62f, -0.94f)
+                lineToRelative(-0.36f, -2.54f)
+                curveToRelative(-0.04f, -0.24f, -0.24f, -0.41f, -0.48f, -0.41f)
+                horizontalLineToRelative(-3.84f)
+                curveToRelative(-0.24f, 0f, -0.43f, 0.17f, -0.47f, 0.41f)
+                lineToRelative(-0.36f, 2.54f)
+                curveToRelative(-0.59f, 0.24f, -1.13f, 0.57f, -1.62f, 0.94f)
+                lineToRelative(-2.39f, -0.96f)
+                curveToRelative(-0.22f, -0.08f, -0.47f, 0f, -0.59f, 0.22f)
+                lineTo(2.74f, 8.87f)
+                curveToRelative(-0.12f, 0.21f, -0.08f, 0.47f, 0.12f, 0.61f)
+                lineToRelative(2.03f, 1.58f)
+                curveToRelative(-0.05f, 0.3f, -0.09f, 0.63f, -0.09f, 0.94f)
+                reflectiveCurveToRelative(0.02f, 0.64f, 0.07f, 0.94f)
+                lineToRelative(-2.03f, 1.58f)
+                curveToRelative(-0.18f, 0.14f, -0.23f, 0.41f, -0.12f, 0.61f)
+                lineToRelative(1.92f, 3.32f)
+                curveToRelative(0.12f, 0.22f, 0.37f, 0.29f, 0.59f, 0.22f)
+                lineToRelative(2.39f, -0.96f)
+                curveToRelative(0.5f, 0.38f, 1.03f, 0.7f, 1.62f, 0.94f)
+                lineToRelative(0.36f, 2.54f)
+                curveToRelative(0.05f, 0.24f, 0.24f, 0.41f, 0.48f, 0.41f)
+                horizontalLineToRelative(3.84f)
+                curveToRelative(0.24f, 0f, 0.44f, -0.17f, 0.47f, -0.41f)
+                lineToRelative(0.36f, -2.54f)
+                curveToRelative(0.59f, -0.24f, 1.13f, -0.56f, 1.62f, -0.94f)
+                lineToRelative(2.39f, 0.96f)
+                curveToRelative(0.22f, 0.08f, 0.47f, 0f, 0.59f, -0.22f)
+                lineToRelative(1.92f, -3.32f)
+                curveToRelative(0.12f, -0.22f, 0.07f, -0.47f, -0.12f, -0.61f)
+                lineToRelative(-2.01f, -1.58f)
+                close()
+                moveTo(12f, 15.6f)
+                curveToRelative(-1.98f, 0f, -3.6f, -1.62f, -3.6f, -3.6f)
+                reflectiveCurveToRelative(1.62f, -3.6f, 3.6f, -3.6f)
+                reflectiveCurveToRelative(3.6f, 1.62f, 3.6f, 3.6f)
+                reflectiveCurveToRelative(-1.62f, 3.6f, -3.6f, 3.6f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Koltuk silueti (L biçimi: sırtlık + oturak) — araç detay "Koltuk" kartı. */
+    val Seat: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarSeat",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(7f, 4f)
+                horizontalLineToRelative(3f)
+                verticalLineToRelative(11f)
+                horizontalLineToRelative(6f)
+                verticalLineToRelative(3f)
+                horizontalLineTo(7f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Kilit (asma kilit) — araç detay "Kilidi Aç" butonu. */
+    val Lock: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarLock",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(18f, 8f)
+                horizontalLineToRelative(-1f)
+                verticalLineTo(6f)
+                curveToRelative(0f, -2.76f, -2.24f, -5f, -5f, -5f)
+                reflectiveCurveTo(7f, 3.24f, 7f, 6f)
+                verticalLineToRelative(2f)
+                horizontalLineTo(6f)
+                curveToRelative(-1.1f, 0f, -2f, 0.9f, -2f, 2f)
+                verticalLineToRelative(10f)
+                curveToRelative(0f, 1.1f, 0.9f, 2f, 2f, 2f)
+                horizontalLineToRelative(12f)
+                curveToRelative(1.1f, 0f, 2f, -0.9f, 2f, -2f)
+                verticalLineTo(10f)
+                curveToRelative(0f, -1.1f, -0.9f, -2f, -2f, -2f)
+                close()
+                moveTo(8.9f, 6f)
+                curveToRelative(0f, -1.71f, 1.39f, -3.1f, 3.1f, -3.1f)
+                reflectiveCurveToRelative(3.1f, 1.39f, 3.1f, 3.1f)
+                verticalLineToRelative(2f)
+                horizontalLineTo(8.9f)
+                verticalLineTo(6f)
+                close()
+            }
+        }.build()
+    }
+
     /** Kişi silueti — alt navigasyon "Profil" sekmesi. */
     val Person: ImageVector by lazy {
         ImageVector.Builder(

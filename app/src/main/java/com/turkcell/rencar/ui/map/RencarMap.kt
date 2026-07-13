@@ -2,6 +2,7 @@ package com.turkcell.rencar.ui.map
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.RectF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,6 +98,7 @@ fun RencarMap(
     initialZoom: Double = DEFAULT_ZOOM,
     controller: RencarMapController? = null,
     vehicles: List<VehicleResponse> = emptyList(),
+    onVehicleClick: (String) -> Unit = {},
 ) {
     // @Preview: MapLibre native motoru render edilemez → basit placeholder.
     if (LocalInspectionMode.current) {
@@ -114,6 +117,8 @@ fun RencarMap(
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    // Tıklama listener'ı tek sefer kurulur; en güncel callback'i çağırması için State ile sarılır.
+    val currentOnVehicleClick by rememberUpdatedState(onVehicleClick)
 
     val mapView = remember {
         MapLibre.getInstance(context) // Native motoru başlat.
@@ -182,6 +187,24 @@ fun RencarMap(
                         PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
                     ),
                 )
+
+                // Araç balonuna dokunuş: dokunulan noktanın çevresindeki "vehicles-layer"
+                // feature'ları sorgulanır; ilkinin "id"si detay için Screen'e iletilir.
+                val slop = 22f * context.resources.displayMetrics.density
+                map.addOnMapClickListener { point ->
+                    val screen = map.projection.toScreenLocation(point)
+                    val rect = RectF(screen.x - slop, screen.y - slop, screen.x + slop, screen.y + slop)
+                    val id = map.queryRenderedFeatures(rect, "vehicles-layer")
+                        .firstOrNull()
+                        ?.getStringProperty("id")
+                    if (id != null) {
+                        currentOnVehicleClick(id)
+                        true // dokunuş tüketildi
+                    } else {
+                        false
+                    }
+                }
+
                 mapAndStyle = map to loaded
             }
         }
@@ -245,7 +268,11 @@ private fun updateVehicles(
         }
         Feature.fromGeometry(
             Point.fromLngLat(vehicle.longitude, vehicle.latitude),
-        ).apply { addStringProperty("icon", iconId) }
+        ).apply {
+            addStringProperty("icon", iconId)
+            // Dokunuşta detay ekranı için araç kimliği (queryRenderedFeatures ile okunur).
+            addStringProperty("id", vehicle.id)
+        }
     }
 
     source.setGeoJson(FeatureCollection.fromFeatures(features))

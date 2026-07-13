@@ -90,11 +90,13 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 
 ### API Base URL
 
-- Seçim: **`https://rencar.halitkalayci.com/`** (`BuildConfig.BASE_URL`)
+- Seçim: **`https://rencarv2.halitkalayci.com/`** (`BuildConfig.BASE_URL`)
 
-- Son Güncelleme Tarihi: 09.07.2026
+- Son Güncelleme Tarihi: 13.07.2026
 
-- Sebep: Endpoint'ler KÖK dizinde yayınlanıyor; `/api` prefix'i YOKTUR. Yalnızca Swagger UI `/api/docs` altındadır. curl ile doğrulandı: `/health` ve `/auth/login` → 200; `/api/health` ve `/api/auth/login` → 404. (İlk varsayım `/api/` prefix'iydi; 404 hatası üzerine düzeltildi.)
+- Sebep: Endpoint'ler KÖK dizinde yayınlanıyor; `/api` prefix'i YOKTUR. Yalnızca Swagger UI `/api/docs` altındadır. curl ile doğrulandı: `/health` → 200.
+
+- Not (13.07.2026): **v1 → v2 geçişi.** Eski `rencar.halitkalayci.com` sunucusu `docs/api/openapi.json`'ın gerisindeydi (araç yeni alanlarını — pricePerMinute/fuelPercent/seats vb. — döndürmüyordu, bu yüzden detay ekranı `—` gösteriyordu). `rencarv2.halitkalayci.com` openapi.json ile birebir paralel (path/şema/alan farkı yok; `/reservations`, `/wallet` dahil). curl `swagger-ui-init.js` probe ile doğrulandı.
 
 
 ### Kamera & Yüz Algılama (Ehliyet + Selfie doğrulama)
