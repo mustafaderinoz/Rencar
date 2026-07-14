@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    FileProvider yolları. Ehliyet çekimleri uygulamaya özel iç depoda
-    (filesDir/licenses/) tutulur; harici kamera uygulamasına bu alt yol için
-    geçici yazma izni verilir (grantUriPermissions).
+    FileProvider yolları. Ehliyet çekimleri (filesDir/licenses/) ve kiralama öncesi araç
+    fotoğrafları (filesDir/rental-photos/) uygulamaya özel iç depoda tutulur; harici kamera
+    uygulamasına bu alt yollar için geçici yazma izni verilir (grantUriPermissions).
 -->
 <paths>
     <files-path
         name="licenses"
         path="licenses/" />
+    <files-path
+        name="rental-photos"
+        path="rental-photos/" />
 </paths>

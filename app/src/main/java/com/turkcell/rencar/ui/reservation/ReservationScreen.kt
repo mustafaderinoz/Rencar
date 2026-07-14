@@ -63,17 +63,17 @@ private const val FreeReservationLabel = "15 dk"
 @Composable
 fun ReservationScreen(
     onNavigateBack: () -> Unit,
-    onReserved: () -> Unit,
+    onReserved: (vehicleId: String, plan: RentalPlan) -> Unit,
     viewModel: ReservationViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    // POST /reservations başarılı → kısa bildirim + haritaya dön; bayrağı tüket.
+    // POST /reservations başarılı → kısa bildirim + sonraki adıma geç (plan'a göre foto/Home); bayrağı tüket.
     LaunchedEffect(uiState.reserved) {
         if (uiState.reserved) {
             Toast.makeText(context, "Araç $FreeReservationLabel için rezerve edildi.", Toast.LENGTH_SHORT).show()
-            onReserved()
+            onReserved(uiState.vehicle?.id.orEmpty(), uiState.selectedPlan)
             viewModel.onReservedHandled()
         }
     }

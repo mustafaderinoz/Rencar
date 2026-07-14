@@ -17,6 +17,8 @@ import com.turkcell.rencar.ui.license.LicenseScreen
 import com.turkcell.rencar.ui.licensepending.LicensePendingScreen
 import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
+import com.turkcell.rencar.ui.rentalphotos.RentalPhotosScreen
+import com.turkcell.rencar.ui.reservation.RentalPlan
 import com.turkcell.rencar.ui.reservation.ReservationScreen
 import com.turkcell.rencar.ui.selfie.SelfieScreen
 
@@ -135,8 +137,35 @@ fun RencarNavHost(
         ) {
             ReservationScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // POST /reservations başarılı → onay ekranını kapatıp haritaya (Home) dön.
-                onReserved = { navController.popBackStack() },
+                // POST /reservations başarılı → plan'a göre ilerle: Dakikalık/Saatlik'te kiralama
+                // öncesi araç fotoğraf ekranı; DAILY'de foto adımı yok (API anında ACTIVE), Home'a dön.
+                onReserved = { vehicleId, plan ->
+                    if (plan == RentalPlan.DAILY) {
+                        navController.popBackStack()
+                    } else {
+                        navController.navigate(
+                            RencarDestinations.rentalPhotosRoute(vehicleId, plan.apiPlan),
+                        ) {
+                            // Rezervasyon onayı geri yığından çıkar: foto ekranından geri → Home.
+                            popUpTo(RencarDestinations.RESERVATION_ROUTE) { inclusive = true }
+                        }
+                    }
+                },
+            )
+        }
+        // Araç durumu (kiralama öncesi fotoğraf): vehicleId + plan path argümanını taşır
+        // (RentalPhotosViewModel SavedStateHandle ile okur; açılışta POST /rentals çağırır).
+        composable(
+            route = RencarDestinations.RENTAL_PHOTOS_ROUTE,
+            arguments = listOf(
+                navArgument(RencarDestinations.RENTAL_PHOTOS_ARG_VEHICLE_ID) { type = NavType.StringType },
+                navArgument(RencarDestinations.RENTAL_PHOTOS_ARG_PLAN) { type = NavType.StringType },
+            ),
+        ) {
+            RentalPhotosScreen(
+                onNavigateBack = { navController.popBackStack() },
+                // "Kiralamayı Başlat" → şimdilik Home'a dön (start ucu henüz çağrılmaz).
+                onStart = { navController.popBackStack() },
             )
         }
     }
