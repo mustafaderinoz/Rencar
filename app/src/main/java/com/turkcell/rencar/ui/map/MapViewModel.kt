@@ -1,7 +1,9 @@
 package com.turkcell.rencar.ui.map
 
+import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.turkcell.rencar.data.remote.dto.VehicleResponse
 import com.turkcell.rencar.data.repository.VehicleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.IOException
@@ -38,7 +40,7 @@ class MapViewModel @Inject constructor(
                 }
 
             is MapIntent.LocationChanged ->
-                _uiState.update { it.copy(myLocation = intent.location) }
+                _uiState.update { it.copy(myLocation = intent.location).withDerived() }
 
             MapIntent.CenteredOnUser ->
                 _uiState.update { it.copy(hasCenteredOnUser = true) }
@@ -49,28 +51,82 @@ class MapViewModel @Inject constructor(
 
             MapIntent.LoadVehicles -> loadVehicles()
 
+            is MapIntent.SegmentSelected -> {
+                // Aynı segment tekrar seçilirse yeniden yükleme yapma (gereksiz istek).
+                if (intent.segment == _uiState.value.selectedSegment) return
+                _uiState.update { it.copy(selectedSegment = intent.segment) }
+                loadVehicles()
+            }
+
             is MapIntent.VehicleClicked ->
                 _uiState.update { it.copy(selectedVehicleId = intent.id) }
 
             MapIntent.VehicleDismissed ->
                 _uiState.update { it.copy(selectedVehicleId = null) }
+
+            // Zoom ve "En Yakın Aracı Bul" saf Screen mekaniğidir (controller); durum değişmez.
+            MapIntent.ZoomIn, MapIntent.ZoomOut, MapIntent.FindNearest -> Unit
+
+            MapIntent.ToggleBottomCard ->
+                _uiState.update { it.copy(bottomCardExpanded = !it.bottomCardExpanded) }
+
+            is MapIntent.LocalityResolved ->
+                _uiState.update { it.copy(localityName = intent.name) }
         }
     }
 
-    /** GET /vehicles: müsait araçları yükler; süregelen bir istek varsa yeni istek başlatılmaz. */
+    /**
+     * GET /vehicles: seçili segmentteki araçları yükler (gri "Kullanımda" balonları için
+     * includeBusy=true). Süregelen bir istek varsa yeni istek başlatılmaz; segment değişiminde
+     * yeniden çağrılır. Başarıda "yakında/en yakın" türetilmiş alanlar da güncellenir.
+     */
     private fun loadVehicles() {
         if (_uiState.value.isLoadingVehicles) return
 
         _uiState.update { it.copy(isLoadingVehicles = true, vehiclesError = null) }
         viewModelScope.launch {
-            vehicleRepository.getAvailableVehicles()
+            vehicleRepository.getAvailableVehicles(
+                segment = _uiState.value.selectedSegment,
+                includeBusy = true,
+            )
                 .onSuccess { vehicles ->
-                    _uiState.update { it.copy(isLoadingVehicles = false, vehicles = vehicles) }
+                    _uiState.update { it.copy(isLoadingVehicles = false, vehicles = vehicles).withDerived() }
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(isLoadingVehicles = false, vehiclesError = e.toMessage()) }
                 }
         }
+    }
+
+    /**
+     * Araç listesi veya konum değiştiğinde alt kartı besleyen türetilmiş alanları yeniden hesaplar:
+     * müsait araç sayısı, en yakın müsait araç ve ona olan düz mesafe. Konum yoksa "en yakın"
+     * listedeki ilk müsait araçtır (mesafe null).
+     */
+    private fun MapUiState.withDerived(): MapUiState {
+        val available = vehicles.filter { VehicleMarkers.isAvailable(it.status) }
+        val loc = myLocation
+        val nearest: VehicleResponse?
+        val distance: Float?
+        if (loc == null) {
+            nearest = available.firstOrNull()
+            distance = null
+        } else {
+            nearest = available.minByOrNull { distanceMeters(loc.latitude, loc.longitude, it) }
+            distance = nearest?.let { distanceMeters(loc.latitude, loc.longitude, it) }
+        }
+        return copy(
+            availableCount = available.size,
+            nearestVehicle = nearest,
+            nearestDistanceMeters = distance,
+        )
+    }
+
+    /** Kullanıcı konumu ↔ araç konumu arası düz mesafe (metre). */
+    private fun distanceMeters(userLat: Double, userLng: Double, vehicle: VehicleResponse): Float {
+        val results = FloatArray(1)
+        Location.distanceBetween(userLat, userLng, vehicle.latitude, vehicle.longitude, results)
+        return results[0]
     }
 
     private fun Throwable.toMessage(): String = when (this) {

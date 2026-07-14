@@ -80,6 +80,16 @@ class RencarMapController internal constructor() {
     fun animateTo(target: LatLng, zoom: Double = DEFAULT_ZOOM) {
         map?.animateCamera(CameraUpdateFactory.newLatLngZoom(target, zoom))
     }
+
+    /** Kamerayı bir kademe yakınlaştırır (+ butonu). */
+    fun zoomIn() {
+        map?.animateCamera(CameraUpdateFactory.zoomIn())
+    }
+
+    /** Kamerayı bir kademe uzaklaştırır (- butonu). */
+    fun zoomOut() {
+        map?.animateCamera(CameraUpdateFactory.zoomOut())
+    }
 }
 
 @Composable
@@ -198,9 +208,11 @@ fun RencarMap(
                 map.addOnMapClickListener { point ->
                     val screen = map.projection.toScreenLocation(point)
                     val rect = RectF(screen.x - slop, screen.y - slop, screen.x + slop, screen.y + slop)
-                    val id = map.queryRenderedFeatures(rect, "vehicles-layer")
-                        .firstOrNull()
-                        ?.getStringProperty("id")
+                    // Yalnızca müsait araç balonları detay açar; gri "Kullanımda" araçlar
+                    // non-owner'a 404 döndüğünden tıklama yok sayılır ("available" == "true").
+                    val feature = map.queryRenderedFeatures(rect, "vehicles-layer")
+                        .firstOrNull { it.getStringProperty("available") == "true" }
+                    val id = feature?.getStringProperty("id")
                     if (id != null) {
                         currentOnVehicleClick(id)
                         true // dokunuş tüketildi
@@ -254,19 +266,25 @@ private fun updateVehicles(
 ) {
     val source = style.getSourceAs<GeoJsonSource>("vehicles") ?: return
 
-    val currentIds = vehicles.mapTo(mutableSetOf()) { "veh-${it.id}" }
-    // Artık listede olmayan araçların ikonlarını stilden kaldır.
+    // İkon kimliği içeriğe göre imzalanır (id + status): araç kullanımdan müsaite geçince
+    // (veya tersi) renk/etiket değişeceğinden bitmap yeniden üretilmelidir.
+    fun iconIdOf(v: VehicleResponse) = "veh-${v.id}-${v.status}"
+
+    val currentIds = vehicles.mapTo(mutableSetOf()) { iconIdOf(it) }
+    // Artık listede olmayan (veya durumu değişen) araçların ikonlarını stilden kaldır.
     val stale = addedIconIds - currentIds
     stale.forEach { style.removeImage(it) }
     addedIconIds.removeAll(stale)
 
     val features = vehicles.map { vehicle ->
-        val iconId = "veh-${vehicle.id}"
+        val available = VehicleMarkers.isAvailable(vehicle.status)
+        val iconId = iconIdOf(vehicle)
         if (addedIconIds.add(iconId)) {
             val bitmap = VehicleMarkers.build(
                 context = context,
-                priceText = VehicleMarkers.priceLabel(vehicle.pricePerDay),
-                backgroundColor = VehicleMarkers.colorForType(vehicle.type),
+                label = VehicleMarkers.labelFor(vehicle.status, vehicle.pricePerDay),
+                backgroundColor = VehicleMarkers.colorFor(vehicle.segment, vehicle.type, vehicle.status),
+                glow = available,
             )
             style.addImage(iconId, bitmap)
         }
@@ -276,6 +294,8 @@ private fun updateVehicles(
             addStringProperty("icon", iconId)
             // Dokunuşta detay ekranı için araç kimliği (queryRenderedFeatures ile okunur).
             addStringProperty("id", vehicle.id)
+            // Yalnızca müsait araçlar tıklanabilir (gri "Kullanımda" araçlar detay açmaz).
+            addStringProperty("available", if (available) "true" else "false")
         }
     }
 

@@ -128,3 +128,14 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - Son Güncelleme Tarihi: 09.07.2026
 
 - Sebep: `POST /license/upload` dosya başına maks. 5MB; kamera tam çözünürlük bunu aşabilir. Yüklemeden önce ~1600px'e küçültülüp q80 sıkıştırılır. Auth token'ı mevcut `AuthInterceptor` üzerinden eklenir.
+
+
+### Mahalle Adı & "~dk" Uzaklık Etiketi (Alt Kart Altyazısı)
+
+- Seçim: **Android cihaz `Geocoder`** (reverse-geocode) + mesafeden yürüme süresi tahmini (~80 m/dk)
+
+- Son Güncelleme Tarihi: 14.07.2026
+
+- Alternatifler: **Sadece mesafe (m/km)** göster, **altyazıyı kaldır**
+
+- Sebep: Tasarımdaki "Kadıköy çevresinde · 3 dk uzaklıkta" satırının RenCar API'sinde KARŞILIĞI YOK (geocoding/semt ucu yoktur — §2.2). Mahalle adı cihazın kendi Geocoder'ıyla (IO dispatcher, bloklayıcı API) çözülür; en yakın araca ~dk mesafeden tahmin edilir. Geocoder yoksa/başarısızsa altyazı sessizce gizlenir. Üstteki arama çubuğu da aynı nedenle DEKORATİFtir (arama ucu yok).
