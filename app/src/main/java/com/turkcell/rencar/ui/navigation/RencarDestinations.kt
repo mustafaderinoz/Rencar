@@ -56,6 +56,19 @@ object RencarDestinations {
     /** Belirli bir araç için somut rezervasyon rotasını üretir ([Uri.encode] ile güvenli kodlama). */
     fun reservationRoute(vehicleId: String): String = "$RESERVATION/${Uri.encode(vehicleId)}"
 
+    // 08 Araç durumu (kiralama öncesi fotoğraf) — Dakikalık/Saatlik rezervasyon sonrası açılır.
+    // Kiralanacak araç id'si + plan path argümanı taşır: "rental_photos/{vehicleId}/{plan}".
+    // (RentalPhotosViewModel açılışta POST /rentals ile kiralamayı PREPARING oluşturur.)
+    const val RENTAL_PHOTOS = "rental_photos"
+    const val RENTAL_PHOTOS_ARG_VEHICLE_ID = "vehicleId"
+    const val RENTAL_PHOTOS_ARG_PLAN = "plan"
+    const val RENTAL_PHOTOS_ROUTE =
+        "$RENTAL_PHOTOS/{$RENTAL_PHOTOS_ARG_VEHICLE_ID}/{$RENTAL_PHOTOS_ARG_PLAN}"
+
+    /** Somut araç durumu rotasını üretir ([plan]: PER_MINUTE/HOURLY; [Uri.encode] ile kodlanır). */
+    fun rentalPhotosRoute(vehicleId: String, plan: String): String =
+        "$RENTAL_PHOTOS/${Uri.encode(vehicleId)}/${Uri.encode(plan)}"
+
     // Home içindeki nested NavHost sekme rotaları (MainScreen). İçerikler şimdilik placeholder.
     const val MAP = "map"
     const val HISTORY = "history"

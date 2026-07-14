@@ -4,6 +4,7 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import com.turkcell.rencar.BuildConfig
 import com.turkcell.rencar.data.remote.api.AuthApi
 import com.turkcell.rencar.data.remote.api.LicenseApi
+import com.turkcell.rencar.data.remote.api.RentalApi
 import com.turkcell.rencar.data.remote.api.ReservationApi
 import com.turkcell.rencar.data.remote.api.VehicleApi
 import com.turkcell.rencar.data.remote.interceptor.AuthInterceptor
@@ -71,4 +72,8 @@ object NetworkModule {
     @Singleton
     fun provideReservationApi(retrofit: Retrofit): ReservationApi =
         retrofit.create(ReservationApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideRentalApi(retrofit: Retrofit): RentalApi = retrofit.create(RentalApi::class.java)
 }
