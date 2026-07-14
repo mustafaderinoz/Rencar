@@ -4,15 +4,18 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Geocoder
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +25,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -50,6 +54,8 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import com.turkcell.rencar.ui.icons.RencarIcons
 import com.turkcell.rencar.ui.theme.RenCarTheme
 import com.turkcell.rencar.ui.vehicledetail.VehicleDetailScreen
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.maplibre.android.geometry.LatLng
 
 /** İnce + kaba konum izinleri; ikisinden biri yeterlidir. */
@@ -57,6 +63,9 @@ private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,
     Manifest.permission.ACCESS_COARSE_LOCATION,
 )
+
+/** "En Yakın Aracı Bul" ile en yakın araca gidince kullanılan yakınlaştırma seviyesi. */
+private const val NEAREST_ZOOM = 15.0
 
 // ── Stateful sarmalayıcı (§4.5): framework mekaniğini yönetir, durumu VM'e intent'ler ──
 @Composable
@@ -87,7 +96,7 @@ fun MapScreen(
         }
     }
 
-    // İlk açılış: müsait araçları API'den yükle (konum iznine bağlı değildir).
+    // İlk açılış: araçları API'den yükle (konum iznine bağlı değildir).
     LaunchedEffect(Unit) {
         viewModel.onIntent(MapIntent.LoadVehicles)
     }
@@ -116,6 +125,15 @@ fun MapScreen(
         viewModel.onIntent(MapIntent.CenteredOnUser)
     }
 
+    // Konum çözülünce mahalle adını cihaz Geocoder'ıyla bir kez çöz (API dışı, decisions.md).
+    // Alt kart altyazısındaki "… çevresinde" bilgisini besler; başarısızsa sessizce atlanır.
+    LaunchedEffect(uiState.myLocation) {
+        val location = uiState.myLocation ?: return@LaunchedEffect
+        if (uiState.localityName != null) return@LaunchedEffect
+        val name = withContext(Dispatchers.IO) { reverseGeocodeLocality(context, location) }
+        viewModel.onIntent(MapIntent.LocalityResolved(name))
+    }
+
     MapScreen(
         uiState = uiState,
         controller = mapController,
@@ -130,6 +148,18 @@ fun MapScreen(
                         }
                     } else {
                         permissionLauncher.launch(LOCATION_PERMISSIONS)
+                    }
+                }
+
+                // Zoom saf görsel iş: controller kamerayı bir kademe oynatır (VM'e gitmez).
+                MapIntent.ZoomIn -> mapController.zoomIn()
+                MapIntent.ZoomOut -> mapController.zoomOut()
+
+                // En yakın müsait araca kamerayı taşı ve detay alt sayfasını aç.
+                MapIntent.FindNearest -> {
+                    uiState.nearestVehicle?.let { v ->
+                        mapController.animateTo(LatLng(v.latitude, v.longitude), NEAREST_ZOOM)
+                        viewModel.onIntent(MapIntent.VehicleClicked(v.id))
                     }
                 }
 
@@ -160,20 +190,7 @@ private fun MapScreen(
             onVehicleClick = { id -> onIntent(MapIntent.VehicleClicked(id)) },
         )
 
-        // Sağ alt -> konumu yeniden al ve kamerayı tekrar zoomla.
-        FloatingActionButton(
-            onClick = { onIntent(MapIntent.RecenterClicked) },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
-        ) {
-            Icon(RencarIcons.MyLocation, contentDescription = "Konumuma git")
-        }
-
-        // Araç yükleme hatası — sessiz kalmasın diye üstte görünür banner + tekrar dene.
+        // Üst -> araç yükleme hatası (varsa); sessiz kalmasın diye görünür banner + tekrar dene.
         if (uiState.vehiclesError != null) {
             Surface(
                 modifier = Modifier
@@ -205,6 +222,58 @@ private fun MapScreen(
             }
         }
 
+        // Alt -> zoom/konum kontrolleri (sağa yaslı) ve hemen altında kalıcı bilgi kartı.
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+        ) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .padding(end = 16.dp, bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                SmallFloatingActionButton(
+                    onClick = { onIntent(MapIntent.ZoomIn) },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(text = "+", style = MaterialTheme.typography.titleLarge)
+                }
+                Spacer(Modifier.height(8.dp))
+                SmallFloatingActionButton(
+                    onClick = { onIntent(MapIntent.ZoomOut) },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Text(text = "−", style = MaterialTheme.typography.titleLarge)
+                }
+                Spacer(Modifier.height(8.dp))
+                FloatingActionButton(
+                    onClick = { onIntent(MapIntent.RecenterClicked) },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ) {
+                    Icon(RencarIcons.MyLocation, contentDescription = "Konumuma git")
+                }
+            }
+
+            MapBottomCard(
+                availableCount = uiState.availableCount,
+                localityName = uiState.localityName,
+                nearestDistanceMeters = uiState.nearestDistanceMeters,
+                selectedSegment = uiState.selectedSegment,
+                expanded = uiState.bottomCardExpanded,
+                onToggle = { onIntent(MapIntent.ToggleBottomCard) },
+                onSegmentSelected = { onIntent(MapIntent.SegmentSelected(it)) },
+                onFindNearest = { onIntent(MapIntent.FindNearest) },
+            )
+        }
+
         // Araca dokununca detay alt sayfası (bottom sheet) açılır; veri GET /vehicles/{id}'den gelir.
         // Uzaklık için anlık kullanıcı konumu iletilir (yoksa uzaklık satırı gizlenir).
         val selectedVehicleId = uiState.selectedVehicleId
@@ -230,12 +299,28 @@ private fun MapScreen(
     }
 }
 
+
 /** İnce ya da kaba konum izninden en az biri verilmiş mi. */
 private fun Context.hasLocationPermission(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
         PackageManager.PERMISSION_GRANTED ||
         ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
         PackageManager.PERMISSION_GRANTED
+
+/**
+ * Konumu cihaz Geocoder'ıyla bir mahalle/semt adına çevirir (API DIŞI). Geocoder bloklayıcıdır;
+ * çağıran IO dispatcher'ında yürütür. Servis yoksa veya hata olursa null döner (altyazı gizlenir).
+ */
+@Suppress("DEPRECATION")
+private fun reverseGeocodeLocality(context: Context, location: LatLng): String? {
+    if (!Geocoder.isPresent()) return null
+    return runCatching {
+        Geocoder(context)
+            .getFromLocation(location.latitude, location.longitude, 1)
+            ?.firstOrNull()
+            ?.let { it.subLocality ?: it.locality ?: it.subAdminArea }
+    }.getOrNull()
+}
 
 /** Cache'lenmiş son konum yerine taze, tek seferlik yüksek doğruluklu konum ister. */
 @SuppressLint("MissingPermission")
@@ -275,7 +360,7 @@ private fun startLocationUpdates(
 private fun MapScreenLightPreview() {
     RenCarTheme(darkTheme = false) {
         MapScreen(
-            uiState = MapUiState(),
+            uiState = MapUiState(availableCount = 12),
             controller = rememberRencarMapController(),
             onIntent = {},
         )
@@ -287,7 +372,7 @@ private fun MapScreenLightPreview() {
 private fun MapScreenDarkPreview() {
     RenCarTheme(darkTheme = true) {
         MapScreen(
-            uiState = MapUiState(),
+            uiState = MapUiState(availableCount = 12),
             controller = rememberRencarMapController(),
             onIntent = {},
         )

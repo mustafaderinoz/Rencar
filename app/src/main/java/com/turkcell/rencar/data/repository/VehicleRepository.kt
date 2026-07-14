@@ -15,11 +15,26 @@ class VehicleRepository @Inject constructor(
     private val vehicleApi: VehicleApi,
 ) {
     /**
-     * Müsait (AVAILABLE) araçları getirir. [type] verilirse ilgili araç tipiyle filtreler
-     * (SEDAN/SUV/HATCHBACK/STATION/MINIVAN); null ise tüm müsait araçlar döner.
+     * Müsait (AVAILABLE) araçları getirir. [type] verilirse araç tipiyle
+     * (SEDAN/SUV/HATCHBACK/STATION/MINIVAN), [segment] verilirse fiyat segmentiyle
+     * (ECONOMY/COMFORT/SUV — haritadaki Tümü/Ekonomik/Konfor/SUV çipleri) filtreler;
+     * null gönderilen parametreler Retrofit tarafından atlanır (tümü döner).
+     *
+     * [includeBusy] true ise RENTED/RESERVED araçlar da döner (haritada gri "Kullanımda"
+     * marker'ları için); istemci `status` alanına bakar. Varsayılan yalnızca AVAILABLE.
      */
-    suspend fun getAvailableVehicles(type: String? = null): Result<List<VehicleResponse>> =
-        runCatching { vehicleApi.list(type = type) }
+    suspend fun getAvailableVehicles(
+        type: String? = null,
+        segment: String? = null,
+        includeBusy: Boolean = false,
+    ): Result<List<VehicleResponse>> =
+        runCatching {
+            vehicleApi.list(
+                type = type,
+                segment = segment,
+                includeBusy = if (includeBusy) "true" else null,
+            )
+        }
 
     /**
      * Tek aracın detayını getirir (araç detay ekranı). Görünmeyen/olmayan araç için API 404

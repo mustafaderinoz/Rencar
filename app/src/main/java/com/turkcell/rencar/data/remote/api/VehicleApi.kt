@@ -12,10 +12,16 @@ interface VehicleApi {
      * Müsait (AVAILABLE) araçları listeler. Auth zorunlu (AuthInterceptor Bearer ekler) ve
      * yalnızca CUSTOMER rolü erişebilir (PENDING → 403). Query'ler opsiyoneldir; null gönderilen
      * parametreler Retrofit tarafından atlanır.
+     *
+     * [includeBusy] = "true" ise RENTED/RESERVED (kullanımda/tutulmuş) araçlar da döner —
+     * harita gri marker'ları için (MAINTENANCE hiçbir zaman dönmez). İstemci `status` alanına
+     * bakarak müsait/kullanımda ayrımını yapar.
      */
     @GET("vehicles")
     suspend fun list(
         @Query("type") type: String? = null,
+        @Query("segment") segment: String? = null,
+        @Query("includeBusy") includeBusy: String? = null,
         @Query("page") page: Int? = null,
         @Query("limit") limit: Int? = null,
     ): List<VehicleResponse>

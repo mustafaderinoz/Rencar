@@ -2,6 +2,7 @@ package com.turkcell.rencar.ui.map
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -11,23 +12,42 @@ import android.graphics.Typeface
 import kotlin.math.ceil
 
 /**
- * Harita üzerindeki araçlar için "fiyat balonu" ikonlarını üretir. Harita stili (OSM_STYLE_JSON)
- * font/glyphs kaynağı içermediğinden SymbolLayer `text-field` kullanılamaz; bu yüzden araç
- * ikonu + fiyat yazısı Canvas ile bir bitmap'e çizilip [org.maplibre.android.maps.Style.addImage]
- * ile ikon olarak eklenir. Renk, aracın API tipine göre seçilir (marka kimliği, tema bağımsız).
+ * Harita üzerindeki araçlar için "fiyat balonu" ikonlarını üretir. Harita stili font/glyphs
+ * kaynağı içermediğinden SymbolLayer `text-field` kullanılamaz; bu yüzden araç ikonu + yazı
+ * Canvas ile bir bitmap'e çizilip [org.maplibre.android.maps.Style.addImage] ile ikon olarak
+ * eklenir. Renk, aracın segmentine (yoksa tipine) göre seçilir; kullanımdaki (busy) araçlar
+ * gri çizilir. Balonun etrafına, tasarımdaki gibi kategori renginde yumuşak bir "glow" eklenir.
  */
 object VehicleMarkers {
 
-    // Araç tipi → balon rengi (ARGB). Değerler Color.kt'deki tema bağımsız Cat* tonlarıyla aynı;
+    // Kategori → balon rengi (ARGB). Color.kt'deki tema bağımsız Cat* tonlarıyla birebir;
     // Compose Color'a bağımlı kalmamak için android.graphics tarafında hex olarak tutulur.
     private const val BRAND_BLUE = 0xFF1A6BF0.toInt() // LightPrimary (SEDAN + varsayılan)
-    private const val CAT_SUV = 0xFFF5B301.toInt()    // CatSuv
-    private const val CAT_ECONOMY = 0xFFF97316.toInt() // CatEconomy
-    private const val CAT_COMFORT = 0xFF7C4DFF.toInt() // CatComfort
-    private const val CAT_ELECTRIC = 0xFF14B8A6.toInt() // CatElectric
+    private const val CAT_SUV = 0xFFF5B301.toInt()     // CatSuv (🟡)
+    private const val CAT_ECONOMY = 0xFFF97316.toInt()  // CatEconomy (🟠)
+    private const val CAT_COMFORT = 0xFF7C4DFF.toInt()  // CatComfort (🟣)
+    private const val CAT_ELECTRIC = 0xFF14B8A6.toInt() // CatElectric (🟢)
+    private const val CAT_BUSY = 0xFF64748B.toInt()     // CatBusy (⚪ Kullanımda)
 
-    /** API araç tipini balon rengine eşler (SEDAN/SUV/HATCHBACK/STATION/MINIVAN). */
-    fun colorForType(type: String): Int = when (type.uppercase()) {
+    /** Araç AVAILABLE mı (marker rengi/etiketi/tıklanabilirliği buna bağlıdır). */
+    fun isAvailable(status: String): Boolean = status.uppercase() == "AVAILABLE"
+
+    /**
+     * Balon rengini seçer: kullanımdaki araç → gri; müsait araç → segment rengi
+     * (ECONOMY/COMFORT/SUV), segment yoksa tip rengine düşer.
+     */
+    fun colorFor(segment: String?, type: String, status: String): Int {
+        if (!isAvailable(status)) return CAT_BUSY
+        return when (segment?.uppercase()) {
+            "ECONOMY" -> CAT_ECONOMY
+            "COMFORT" -> CAT_COMFORT
+            "SUV" -> CAT_SUV
+            else -> colorForType(type)
+        }
+    }
+
+    /** API araç tipini balon rengine eşler (segment yokken yedek). */
+    private fun colorForType(type: String): Int = when (type.uppercase()) {
         "SUV" -> CAT_SUV
         "HATCHBACK" -> CAT_ECONOMY
         "STATION" -> CAT_COMFORT
@@ -36,14 +56,19 @@ object VehicleMarkers {
         else -> BRAND_BLUE
     }
 
+    /** Balon etiketi: müsaitse günlük fiyat ("₺1500"), kullanımdaysa "Kullanımda". */
+    fun labelFor(status: String, pricePerDay: Double): String =
+        if (isAvailable(status)) priceLabel(pricePerDay) else "Kullanımda"
+
     /** Günlük fiyatı "₺1500" biçiminde etikete dönüştürür (kuruş yuvarlanır). */
-    fun priceLabel(pricePerDay: Double): String = "₺" + pricePerDay.toLong()
+    private fun priceLabel(pricePerDay: Double): String = "₺" + pricePerDay.toLong()
 
     /**
-     * Verilen [priceText] ve [backgroundColor] için, alt ucu konuma bakan (bottom-anchor)
-     * yuvarlak fiyat balonu bitmap'i üretir. Ölçüler cihaz yoğunluğuna (dp) göre ölçeklenir.
+     * Verilen [label] ve [backgroundColor] için, alt ucu konuma bakan (bottom-anchor) yuvarlak
+     * balon bitmap'i üretir; etrafına kategori renginde yumuşak glow çizer. [glow] false ise
+     * (ör. kullanımdaki araç) halo daha sönük kalır. Ölçüler cihaz yoğunluğuna (dp) göre ölçeklenir.
      */
-    fun build(context: Context, priceText: String, backgroundColor: Int): Bitmap {
+    fun build(context: Context, label: String, backgroundColor: Int, glow: Boolean = true): Bitmap {
         val d = context.resources.displayMetrics.density
         fun dp(v: Float) = v * d
 
@@ -61,9 +86,10 @@ object VehicleMarkers {
         val pillH = dp(30f)
         val tailH = dp(6f)
         val tailW = dp(10f)
-        val margin = dp(4f) // gölge + tail taşması için kenar boşluğu
+        val glowRadius = dp(9f)
+        val margin = dp(12f) // glow + gölge + tail taşması için kenar boşluğu
 
-        val textWidth = textPaint.measureText(priceText)
+        val textWidth = textPaint.measureText(label)
         val pillW = padH + iconSize + gap + textWidth + padH
         val width = ceil(pillW + margin * 2).toInt()
         val height = ceil(pillH + tailH + margin * 2).toInt()
@@ -76,6 +102,15 @@ object VehicleMarkers {
         val right = left + pillW
         val bottom = top + pillH
         val centerX = (left + right) / 2f
+        val radius = pillH / 2f
+
+        // Glow — balonun arkasına kategori renginde bulanık halo (tasarımdaki neon parıltı).
+        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = backgroundColor
+            alpha = if (glow) 150 else 60
+            maskFilter = BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawRoundRect(left, top, right, bottom, radius, radius, glowPaint)
 
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = backgroundColor
@@ -83,7 +118,6 @@ object VehicleMarkers {
         }
 
         // Balon gövdesi (tam yuvarlatılmış = kapsül).
-        val radius = pillH / 2f
         canvas.drawRoundRect(left, top, right, bottom, radius, radius, bgPaint)
 
         // Alt ok (tail) — konum noktasını işaret eder.
@@ -98,10 +132,10 @@ object VehicleMarkers {
         // Araç silueti (beyaz) — sol tarafta.
         drawCar(canvas, left + padH, top + (pillH - iconSize) / 2f, iconSize, white)
 
-        // Fiyat yazısı — dikeyde ortalanmış.
+        // Etiket yazısı — dikeyde ortalanmış.
         val fm = textPaint.fontMetrics
         val baseline = top + pillH / 2f - (fm.ascent + fm.descent) / 2f
-        canvas.drawText(priceText, left + padH + iconSize + gap, baseline, textPaint)
+        canvas.drawText(label, left + padH + iconSize + gap, baseline, textPaint)
 
         return bitmap
     }
