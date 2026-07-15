@@ -28,6 +28,12 @@ data class VerifyOtpRequest(
     val code: String,
 )
 
+/** POST /auth/refresh gövdesi (RefreshTokenDto). Geçerli refresh token'la yeni token çifti alınır. */
+@Serializable
+data class RefreshTokenRequest(
+    val refreshToken: String,
+)
+
 /** /auth/verify-otp & /auth/register & /auth/refresh 200 yanıtı (AuthResponseDto). */
 @Serializable
 data class AuthResponse(
