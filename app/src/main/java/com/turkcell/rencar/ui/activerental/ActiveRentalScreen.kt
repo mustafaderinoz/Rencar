@@ -164,10 +164,11 @@ private fun Content(
         MetricsRow(uiState)
         Spacer(Modifier.height(14.dp))
 
-        if (uiState.isFinished) {
-            FinishedBanner(uiState.receipt)
-        } else {
-            StartFeeBanner(uiState.startFee)
+        when {
+            uiState.isFinished -> FinishedBanner(uiState.receipt)
+            // Simülasyon henüz başlamadı → kullanıcıyı "Kilitle / Aç" ile başlatmaya yönlendir.
+            !uiState.started -> StartHintBanner()
+            else -> StartFeeBanner(uiState.startFee)
         }
 
         Spacer(Modifier.weight(1f))
@@ -326,6 +327,18 @@ private fun Metric(label: String, value: String, valueColor: Color, modifier: Mo
     }
 }
 
+// ── Başlamadan önce: kullanıcıyı "Kilitle / Aç" ile yolculuğu başlatmaya yönlendiren ipucu (mavi) ──
+@Composable
+private fun StartHintBanner() {
+    InfoBanner(
+        icon = RencarIcons.Lock,
+        iconTint = RencarBlue,
+        background = RencarBlue.copy(alpha = 0.08f),
+        text = "Yolculuğu başlatmak için aşağıdaki “Kilitle / Aç” düğmesine dokunun; " +
+            "süre ve ücret bundan sonra işlemeye başlar.",
+    )
+}
+
 // ── Bilgi kartı: başlangıç ücreti açıklaması (mavi) ──
 @Composable
 private fun StartFeeBanner(startFee: Double) {
@@ -442,7 +455,8 @@ private fun BottomActions(
 
         Button(
             onClick = { onIntent(ActiveRentalIntent.FinishClicked) },
-            enabled = !uiState.isFinishing,
+            // Simülasyon başlamadan (started=false) bitirilecek bir şey yok → pasif.
+            enabled = uiState.started && !uiState.isFinishing,
             modifier = Modifier
                 .weight(1.3f)
                 .height(56.dp),
@@ -522,6 +536,7 @@ private fun formatFee(value: Double): String = "%.0f".format(value)
 
 // ── Preview'lar: stateless gövde, Hilt'siz, sabit state (§4.5). RencarMap önizlemede placeholder. ──
 private val PreviewState = ActiveRentalUiState(
+    started = true,
     isLoading = false,
     rentalId = "clx0rent1234567890",
     vehicleTitle = "Renault Clio",

@@ -14,8 +14,13 @@ import com.turkcell.rencar.data.model.VehiclePoint
  * Yalnızca saf UI durumunu tutar; navigasyon/framework mekaniği ekran katmanındadır (§4.5–4.6).
  */
 data class ActiveRentalUiState(
-    /** İlk yükleme (GET /rentals/active) sürüyor. */
-    val isLoading: Boolean = true,
+    /**
+     * Simülasyon "Kilitle / Aç" ile başladı mı. Başlamadan poll/sayaç/socket çalışmaz; ekran
+     * boş (idle) Content + "kilidi aç" ipucu gösterir. İlk basışta true olur (bkz. [ActiveRentalIntent.LockToggle]).
+     */
+    val started: Boolean = false,
+    /** İlk yükleme (GET /rentals/active) sürüyor. Simülasyon başlamadan false (idle ekran görünür). */
+    val isLoading: Boolean = false,
     /** İlk yükleme hatası (tam ekran hata + tekrar dene); yoksa null. */
     val loadError: String? = null,
 
@@ -69,6 +74,9 @@ sealed interface ActiveRentalIntent {
     /** "Kiralamayı Bitir" → POST /rentals/{id}/finish (yolculuk + simülasyon sonlanır). */
     data object FinishClicked : ActiveRentalIntent
 
-    /** "Kilitle / Aç" → yalnız yerel görsel durumu çevirir (API ucu yok). */
+    /**
+     * "Kilitle / Aç" → yerel görsel kilit durumunu çevirir (API ucu yok). **İlk basış** ayrıca
+     * simülasyonu (poll + sayaç + socket) başlatır; sonraki basışlar yalnız görsel toggle'dır.
+     */
     data object LockToggle : ActiveRentalIntent
 }

@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -66,7 +65,6 @@ fun VehicleDetailScreen(
     userLongitude: Double?,
     modifier: Modifier = Modifier,
     onReserve: () -> Unit = {},
-    onUnlock: () -> Unit = {},
     viewModel: VehicleDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,7 +79,6 @@ fun VehicleDetailScreen(
         onIntent = { intent ->
             when (intent) {
                 VehicleDetailIntent.ReserveClicked -> { viewModel.onIntent(intent); onReserve() }
-                VehicleDetailIntent.UnlockClicked -> { viewModel.onIntent(intent); onUnlock() }
                 else -> viewModel.onIntent(intent)
             }
         },
@@ -257,48 +254,22 @@ private fun VehicleContent(
 
     Spacer(Modifier.height(20.dp))
 
-    // Butonlar — kural: araç kiralanmamış (AVAILABLE) ise Rezerve Et aktif, Kilidi Aç pasif.
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        OutlinedButton(
-            onClick = { onIntent(VehicleDetailIntent.ReserveClicked) },
-            enabled = isAvailable,
-            modifier = Modifier
-                .weight(1f)
-                .height(54.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = RencarBlue),
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (isAvailable) RencarBlue else MaterialTheme.colorScheme.outlineVariant,
-            ),
-        ) {
-            Text(text = "Rezerve Et", style = MaterialTheme.typography.titleMedium)
-        }
-
-        Button(
-            onClick = { onIntent(VehicleDetailIntent.UnlockClicked) },
-            // Yalnız rezerve/kiralanmış araçta anlamlı; müsait araçta (kiralanmamış) pasif.
-            enabled = !isAvailable,
-            modifier = Modifier
-                .weight(1f)
-                .height(54.dp),
-            shape = RoundedCornerShape(16.dp),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = RencarBlue,
-                contentColor = Color.White,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
-            Icon(
-                imageVector = RencarIcons.Lock,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(text = "Kilidi Aç", style = MaterialTheme.typography.titleMedium)
-        }
+    // Rezerve Et — araç kiralanmamış (AVAILABLE) ise aktif, aksi halde pasif. Tam genişlik.
+    // ("Kilidi Aç" butonu kaldırıldı: kilit/aç API ucu yok, buton bağlanmıyordu.)
+    OutlinedButton(
+        onClick = { onIntent(VehicleDetailIntent.ReserveClicked) },
+        enabled = isAvailable,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = RencarBlue),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isAvailable) RencarBlue else MaterialTheme.colorScheme.outlineVariant,
+        ),
+    ) {
+        Text(text = "Rezerve Et", style = MaterialTheme.typography.titleMedium)
     }
 }
 

@@ -39,7 +39,4 @@ sealed interface VehicleDetailIntent {
 
     /** "Rezerve Et" (araç AVAILABLE iken aktif). Rezervasyon ucu (POST /reservations) bu iş kapsamında bağlanmaz. */
     data object ReserveClicked : VehicleDetailIntent
-
-    /** "Kilidi Aç" (yalnız rezerve/kiralanmış araçta aktif; şimdilik pasif). Bağlanmaz. */
-    data object UnlockClicked : VehicleDetailIntent
 }

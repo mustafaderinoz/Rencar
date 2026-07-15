@@ -22,7 +22,8 @@ import retrofit2.HttpException
 /**
  * Aktif Yolculuk ekranının tek durum kaynağı (§4.4).
  *
- * Üç canlı iş yürütür (hepsi [viewModelScope]'ta; ekran/VM ölünce durur):
+ * Simülasyon otomatik başlamaz: "Kilitle / Aç" ilk basışında ([lockToggle]) üç canlı iş başlar
+ * (hepsi [viewModelScope]'ta; ekran/VM ölünce durur):
  *  1. **Poll** — GET /rentals/active'i periyodik çeker; anlık ücret/mesafe/geçen süre buradan gelir.
  *  2. **Sayaç** — geçen süreyi ekranda 1 sn'de bir akıtır; her poll'de sunucu değeriyle resync eder.
  *  3. **Socket** — [RentalRepository.vehiclePositionStream] ile aracın canlı konumunu toplar (harita).
@@ -51,20 +52,38 @@ class ActiveRentalViewModel @Inject constructor(
     private var tickerJob: Job? = null
     private var socketJob: Job? = null
 
-    init {
-        startPolling()
-        startTicker()
-        observeVehicle()
-    }
+    // Simülasyon (poll+sayaç+socket) artık init'te DEĞİL, "Kilitle / Aç" ilk basışında başlar.
 
     fun onIntent(intent: ActiveRentalIntent) {
         when (intent) {
             ActiveRentalIntent.Retry -> retry()
             ActiveRentalIntent.FinishClicked -> finishRental()
-            ActiveRentalIntent.LockToggle ->
-                // API ucu yok — yalnız yerel görsel durum (decisions.md/§2.2: uydurulmaz).
-                _uiState.update { it.copy(locked = !it.locked) }
+            ActiveRentalIntent.LockToggle -> lockToggle()
         }
+    }
+
+    /**
+     * "Kilitle / Aç": kilit görselini çevirir. **İlk basışta** simülasyonu başlatır (bir sonraki
+     * poll gelene kadar tam-ekran "başlatılıyor" spinner'ı için isLoading=true). Kilit/aç API ucu
+     * yoktur (decisions.md/§2.2: uydurulmaz); ağ çağrısı yapılmaz.
+     */
+    private fun lockToggle() {
+        val alreadyStarted = _uiState.value.started
+        _uiState.update {
+            it.copy(
+                locked = !it.locked,
+                started = true,
+                isLoading = if (alreadyStarted) it.isLoading else true,
+            )
+        }
+        if (!alreadyStarted) startSimulation()
+    }
+
+    /** Üç canlı işi başlatır: GET /rentals/active poll + geçen süre sayacı + Socket.IO konum akışı. */
+    private fun startSimulation() {
+        startPolling()
+        startTicker()
+        observeVehicle()
     }
 
     /** GET /rentals/active döngüsü: ilk turda yükleme/hata, sonraki turlarda sessiz güncelleme. */
