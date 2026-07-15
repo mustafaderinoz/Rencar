@@ -1,8 +1,8 @@
 package com.turkcell.rencar.data.repository
 
+import com.turkcell.rencar.data.mapper.toVerificationStatus
+import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.remote.api.LicenseApi
-import com.turkcell.rencar.data.remote.dto.LicenseResponse
-import com.turkcell.rencar.data.remote.dto.LicenseStatusResponse
 import com.turkcell.rencar.data.util.ImageCompressor
 import java.io.File
 import javax.inject.Inject
@@ -24,15 +24,15 @@ class LicenseRepository @Inject constructor(
      * Ehliyet ön + arka yüzünü yükler. [front]/[back] uygulama iç depodaki JPEG dosyalarıdır;
      * sıkıştırılmış kopya aynı dizinde "*-upload.jpg" olarak üretilip multipart gönderilir.
      */
-    suspend fun upload(front: File, back: File): Result<LicenseResponse> = runCatching {
+    suspend fun upload(front: File, back: File): Result<Unit> = runCatching {
         val frontPart = front.toImagePart(field = "front")
         val backPart = back.toImagePart(field = "back")
         licenseApi.upload(front = frontPart, back = backPart)
-    }
+    }.map { }
 
-    /** Mevcut kullanıcının ehliyet durumunu getirir (NOT_SUBMITTED/UNDER_REVIEW/APPROVED/REJECTED). */
-    suspend fun getStatus(): Result<LicenseStatusResponse> = runCatching {
-        licenseApi.status()
+    /** Mevcut kullanıcının ehliyet doğrulama durumunu getirir ([LicenseVerificationStatus]). */
+    suspend fun getStatus(): Result<LicenseVerificationStatus> = runCatching {
+        licenseApi.status().toVerificationStatus()
     }
 
     /** Dosyayı sıkıştırıp "field" adıyla JPEG multipart parçasına dönüştürür. */

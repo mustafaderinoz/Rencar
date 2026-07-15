@@ -39,7 +39,7 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.VehicleUi
 
 /** Ege / İzmir civarı varsayılan kamera merkezi (konum gelene kadar gösterilir). */
 val DEFAULT_CENTER: LatLng = LatLng(38.51740367746754, 27.161930350129918)
@@ -107,7 +107,7 @@ fun RencarMap(
     initialCenter: LatLng = DEFAULT_CENTER,
     initialZoom: Double = DEFAULT_ZOOM,
     controller: RencarMapController? = null,
-    vehicles: List<VehicleResponse> = emptyList(),
+    vehicles: List<VehicleUi> = emptyList(),
     onVehicleClick: (String) -> Unit = {},
 ) {
     // @Preview: MapLibre native motoru render edilemez → basit placeholder.
@@ -261,14 +261,14 @@ private fun updateMe(style: Style, myLocation: LatLng?) {
 private fun updateVehicles(
     context: Context,
     style: Style,
-    vehicles: List<VehicleResponse>,
+    vehicles: List<VehicleUi>,
     addedIconIds: MutableSet<String>,
 ) {
     val source = style.getSourceAs<GeoJsonSource>("vehicles") ?: return
 
     // İkon kimliği içeriğe göre imzalanır (id + status): araç kullanımdan müsaite geçince
     // (veya tersi) renk/etiket değişeceğinden bitmap yeniden üretilmelidir.
-    fun iconIdOf(v: VehicleResponse) = "veh-${v.id}-${v.status}"
+    fun iconIdOf(v: VehicleUi) = "veh-${v.id}-${v.status}"
 
     val currentIds = vehicles.mapTo(mutableSetOf()) { iconIdOf(it) }
     // Artık listede olmayan (veya durumu değişen) araçların ikonlarını stilden kaldır.

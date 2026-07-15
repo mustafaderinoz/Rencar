@@ -3,8 +3,7 @@ package com.turkcell.rencar.ui.rentalphotos
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.turkcell.rencar.data.remote.dto.RentalPhotosState
-import com.turkcell.rencar.data.remote.dto.RentalResponse
+import com.turkcell.rencar.data.model.RentalPhotosUi
 import com.turkcell.rencar.data.repository.RentalRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -105,8 +104,8 @@ class RentalPhotosViewModel @Inject constructor(
                         it.copy(
                             isCreating = false,
                             rentalId = rental.id,
-                            vehicleTitle = rental.vehicleTitle(),
-                            vehiclePlate = rental.vehicle.plate,
+                            vehicleTitle = rental.vehicleTitle,
+                            vehiclePlate = rental.vehiclePlate,
                         )
                     }
                 }
@@ -148,14 +147,12 @@ class RentalPhotosViewModel @Inject constructor(
     }
 
     /** POST cevabındaki güncel foto durumunu (yüklü yönler + sayaç + tamamlanma) uygular. */
-    private fun RentalPhotosUiState.applyPhotosState(state: RentalPhotosState): RentalPhotosUiState =
+    private fun RentalPhotosUiState.applyPhotosState(state: RentalPhotosUi): RentalPhotosUiState =
         copy(
-            uploadedSides = state.photos.mapNotNull { PhotoSide.fromApi(it.side) }.toSet(),
+            uploadedSides = state.uploadedSides.mapNotNull { PhotoSide.fromApi(it) }.toSet(),
             uploadedCount = state.uploadedCount,
             photosComplete = state.photosComplete,
         )
-
-    private fun RentalResponse.vehicleTitle(): String = "${vehicle.brand} ${vehicle.model}"
 
     private fun Throwable.toCreateMessage(): String = when (this) {
         is HttpException -> when (code()) {

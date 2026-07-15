@@ -1,6 +1,6 @@
 package com.turkcell.rencar.ui.vehicledetail
 
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.VehicleUi
 
 /**
  * Araç Detay — saf UI durumu (§4.2).
@@ -13,7 +13,7 @@ import com.turkcell.rencar.data.remote.dto.VehicleResponse
 data class VehicleDetailUiState(
     val isLoading: Boolean = false,
     /** GET /vehicles/{id} sonucu; null iken içerik yerine yükleniyor/hata gösterilir. */
-    val vehicle: VehicleResponse? = null,
+    val vehicle: VehicleUi? = null,
     /** Kullanıcı konumu ↔ araç konumu arası metre; konum yoksa null (uzaklık satırı gizlenir). */
     val distanceMeters: Float? = null,
     /** Yükleme başarısızsa gösterilecek mesaj (yoksa null). */

@@ -3,7 +3,7 @@ package com.turkcell.rencar.ui.map
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.VehicleUi
 import com.turkcell.rencar.data.repository.VehicleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.IOException
@@ -106,7 +106,7 @@ class MapViewModel @Inject constructor(
     private fun MapUiState.withDerived(): MapUiState {
         val available = vehicles.filter { VehicleMarkers.isAvailable(it.status) }
         val loc = myLocation
-        val nearest: VehicleResponse?
+        val nearest: VehicleUi?
         val distance: Float?
         if (loc == null) {
             nearest = available.firstOrNull()
@@ -123,7 +123,7 @@ class MapViewModel @Inject constructor(
     }
 
     /** Kullanıcı konumu ↔ araç konumu arası düz mesafe (metre). */
-    private fun distanceMeters(userLat: Double, userLng: Double, vehicle: VehicleResponse): Float {
+    private fun distanceMeters(userLat: Double, userLng: Double, vehicle: VehicleUi): Float {
         val results = FloatArray(1)
         Location.distanceBetween(userLat, userLng, vehicle.latitude, vehicle.longitude, results)
         return results[0]

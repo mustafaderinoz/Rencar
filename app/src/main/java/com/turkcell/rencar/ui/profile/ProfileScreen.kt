@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 // androidx.hilt 1.3.0: hiltViewModel() kanonik olarak bu pakette (decisions.md).
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.ui.icons.RencarIcons
 import com.turkcell.rencar.ui.theme.LightPrimary
 import com.turkcell.rencar.ui.theme.RenCarTheme

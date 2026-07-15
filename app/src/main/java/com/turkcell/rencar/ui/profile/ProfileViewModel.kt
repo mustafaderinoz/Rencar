@@ -2,6 +2,7 @@ package com.turkcell.rencar.ui.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.data.repository.LicenseRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,13 +46,13 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.me()
                 .onSuccess { user ->
-                    val status = licenseRepository.getStatus().getOrNull()?.status
+                    val status = licenseRepository.getStatus().getOrNull() ?: LicenseVerificationStatus.UNKNOWN
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             fullName = user.fullName,
                             phone = formatPhone(user.phone),
-                            licenseStatus = status.toVerificationStatus(),
+                            licenseStatus = status,
                         )
                     }
                 }
@@ -59,15 +60,6 @@ class ProfileViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
                 }
         }
-    }
-
-    /** API ehliyet durumu string'ini UI enum'una eşler; bilinmeyen/null → [LicenseVerificationStatus.UNKNOWN]. */
-    private fun String?.toVerificationStatus(): LicenseVerificationStatus = when (this) {
-        "APPROVED" -> LicenseVerificationStatus.APPROVED
-        "UNDER_REVIEW" -> LicenseVerificationStatus.UNDER_REVIEW
-        "REJECTED" -> LicenseVerificationStatus.REJECTED
-        "NOT_SUBMITTED" -> LicenseVerificationStatus.NOT_SUBMITTED
-        else -> LicenseVerificationStatus.UNKNOWN
     }
 
     /**

@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 // androidx.hilt 1.3.0: hiltViewModel() kanonik olarak bu pakette (decisions.md).
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.VehicleUi
 import com.turkcell.rencar.ui.icons.RencarIcons
 import com.turkcell.rencar.ui.theme.LightPrimary
 import com.turkcell.rencar.ui.theme.RenCarTheme
@@ -124,7 +124,7 @@ private fun VehicleDetailScreen(
 // ── İçerik ──
 @Composable
 private fun VehicleContent(
-    vehicle: VehicleResponse,
+    vehicle: VehicleUi,
     distanceMeters: Float?,
     isAvailable: Boolean,
     onIntent: (VehicleDetailIntent) -> Unit,
@@ -484,7 +484,7 @@ private fun categoryColor(type: String): Color = when (type.uppercase()) {
 }
 
 // ── Preview'lar: stateless gövde, Hilt'siz, sabit state (§4.5) ──
-private val PreviewVehicle = VehicleResponse(
+private val PreviewVehicle = VehicleUi(
     id = "veh-1",
     plate = "34 RNC 022",
     brand = "Renault",
@@ -501,8 +501,6 @@ private val PreviewVehicle = VehicleResponse(
     status = "AVAILABLE",
     latitude = 41.0151,
     longitude = 28.9795,
-    createdAt = "2026-06-30T10:00:00.000Z",
-    updatedAt = "2026-06-30T10:00:00.000Z",
 )
 
 @Preview(name = "VehicleDetail · Light", showBackground = true)

@@ -3,6 +3,7 @@ package com.turkcell.rencar.ui.otp
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.data.repository.LicenseRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
@@ -83,8 +84,8 @@ class OtpVerificationViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
             authRepository.verifyOtp(phone = e164Phone, code = state.otpCode)
-                .onSuccess { auth ->
-                    val destination = resolveDestination(auth.user.role)
+                .onSuccess { user ->
+                    val destination = resolveDestination(user.role)
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -109,9 +110,9 @@ class OtpVerificationViewModel @Inject constructor(
      */
     private suspend fun resolveDestination(role: String): PostVerifyDestination {
         if (role != "PENDING") return PostVerifyDestination.HOME
-        return when (licenseRepository.getStatus().getOrNull()?.status) {
-            "UNDER_REVIEW" -> PostVerifyDestination.LICENSE_PENDING
-            "APPROVED" -> PostVerifyDestination.HOME
+        return when (licenseRepository.getStatus().getOrNull()) {
+            LicenseVerificationStatus.UNDER_REVIEW -> PostVerifyDestination.LICENSE_PENDING
+            LicenseVerificationStatus.APPROVED -> PostVerifyDestination.HOME
             else -> PostVerifyDestination.LICENSE_UPLOAD
         }
     }

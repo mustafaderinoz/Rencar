@@ -1,7 +1,7 @@
 package com.turkcell.rencar.ui.reservation
 
-import com.turkcell.rencar.data.remote.dto.QuoteResponse
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.QuoteUi
+import com.turkcell.rencar.data.model.VehicleUi
 
 /**
  * Rezervasyon Onayı — saf UI durumu (§4.2).
@@ -17,11 +17,11 @@ data class ReservationUiState(
     /** GET /vehicles/{id} yükleniyor (ilk açılış). */
     val isLoading: Boolean = false,
     /** Araç kartı verisi; null iken yükleniyor/hata gösterilir. */
-    val vehicle: VehicleResponse? = null,
+    val vehicle: VehicleUi? = null,
     /** Seçili kiralama planı (plan çipleri). Varsayılan: Dakikalık. */
     val selectedPlan: RentalPlan = RentalPlan.PER_MINUTE,
     /** Seçili plana ait fiyat önizleme (GET /vehicles/{id}/quote); yükleniyorken/hata null olur. */
-    val quote: QuoteResponse? = null,
+    val quote: QuoteUi? = null,
     /** Plan değişiminde quote yeniden çekilirken true (fiyat satırında ince yükleniyor gösterimi). */
     val isQuoteLoading: Boolean = false,
     /** "Kullanım şartları" onay kutusu. */

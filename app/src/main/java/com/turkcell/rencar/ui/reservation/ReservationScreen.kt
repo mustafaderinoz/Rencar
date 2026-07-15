@@ -42,8 +42,8 @@ import androidx.compose.ui.unit.dp
 // androidx.hilt 1.3.0: hiltViewModel() kanonik olarak bu pakette (decisions.md).
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.turkcell.rencar.data.remote.dto.QuoteResponse
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.QuoteUi
+import com.turkcell.rencar.data.model.VehicleUi
 import com.turkcell.rencar.ui.icons.RencarIcons
 import com.turkcell.rencar.ui.theme.LightPrimary
 import com.turkcell.rencar.ui.theme.RenCarTheme
@@ -197,7 +197,7 @@ private fun TopBar(onBack: () -> Unit) {
 
 // ── Araç kartı: küçük görsel + marka/model, plaka·vites·koltuk, yakıt rozeti ──
 @Composable
-private fun VehicleCard(vehicle: VehicleResponse) {
+private fun VehicleCard(vehicle: VehicleUi) {
     Card {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -274,7 +274,7 @@ private fun FuelBadge(percent: Double) {
 // ── Kiralama planı: 3 çip (Dakikalık/Saatlik/Günlük) ──
 @Composable
 private fun PlanCard(
-    vehicle: VehicleResponse,
+    vehicle: VehicleUi,
     selectedPlan: RentalPlan,
     onPlanSelected: (RentalPlan) -> Unit,
 ) {
@@ -342,7 +342,7 @@ private fun PlanChip(
 // ── Ücret dökümü kartı ──
 @Composable
 private fun BreakdownCard(
-    quote: QuoteResponse?,
+    quote: QuoteUi?,
     estimateLabel: String,
     isQuoteLoading: Boolean,
 ) {
@@ -509,7 +509,7 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
 // ── Yardımcılar ──
 
 /** "34 RNC 022 · Manuel · 5 kişi" — eksik alanlar atlanır. */
-private fun specLine(vehicle: VehicleResponse): String = buildList {
+private fun specLine(vehicle: VehicleUi): String = buildList {
     add(vehicle.plate)
     vehicle.transmission?.let { add(transmissionText(it)) }
     vehicle.seats?.let { add("$it kişi") }
@@ -522,7 +522,7 @@ private fun transmissionText(transmission: String): String = when (transmission.
 }
 
 /** Plan çipinin fiyat satırı; ilgili fiyat null (canlı sunucu) ise "—". */
-private fun planPrice(vehicle: VehicleResponse, plan: RentalPlan): String = when (plan) {
+private fun planPrice(vehicle: VehicleUi, plan: RentalPlan): String = when (plan) {
     RentalPlan.PER_MINUTE -> vehicle.pricePerMinute?.let { "${formatTl(it, 2)}/dk" } ?: "—"
     RentalPlan.HOURLY -> vehicle.pricePerHour?.let { "${formatTl(it, 0)}/sa" } ?: "—"
     RentalPlan.DAILY -> formatTl(vehicle.pricePerDay, 0)
@@ -547,7 +547,7 @@ private fun categoryColor(type: String): Color = when (type.uppercase()) {
 }
 
 // ── Preview'lar: stateless gövde, Hilt'siz, sabit state (§4.5) ──
-private val PreviewVehicle = VehicleResponse(
+private val PreviewVehicle = VehicleUi(
     id = "veh-1",
     plate = "34 RNC 022",
     brand = "Renault",
@@ -557,8 +557,6 @@ private val PreviewVehicle = VehicleResponse(
     status = "AVAILABLE",
     latitude = 41.0151,
     longitude = 28.9795,
-    createdAt = "2026-06-30T10:00:00.000Z",
-    updatedAt = "2026-06-30T10:00:00.000Z",
     pricePerMinute = 4.5,
     pricePerHour = 180.0,
     fuelPercent = 72.0,
@@ -568,7 +566,7 @@ private val PreviewVehicle = VehicleResponse(
     segment = "ECONOMY",
 )
 
-private val PreviewQuote = QuoteResponse(
+private val PreviewQuote = QuoteUi(
     vehicleId = "veh-1",
     plan = "PER_MINUTE",
     minutes = 30,

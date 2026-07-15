@@ -1,5 +1,7 @@
 package com.turkcell.rencar.ui.profile
 
+import com.turkcell.rencar.data.model.LicenseVerificationStatus
+
 /**
  * 07 Profil — saf UI durumu (§4.2).
  *
@@ -18,18 +20,6 @@ data class ProfileUiState(
     /** Profil (me) yüklenemezse gösterilecek mesaj (yoksa null). */
     val errorMessage: String? = null,
 )
-
-/**
- * Ehliyet doğrulama durumunun UI karşılığı. API string'i ([com.turkcell.rencar.data.remote.dto
- * .LicenseStatusResponse.status]) ViewModel'de bu enum'a eşlenir; durum alınamazsa [UNKNOWN].
- */
-enum class LicenseVerificationStatus {
-    APPROVED,
-    UNDER_REVIEW,
-    REJECTED,
-    NOT_SUBMITTED,
-    UNKNOWN,
-}
 
 /**
  * Kullanıcı/ekran aksiyonları (§4.3): parametreli -> data class, parametresiz -> data object.

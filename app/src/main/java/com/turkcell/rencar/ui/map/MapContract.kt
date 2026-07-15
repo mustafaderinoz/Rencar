@@ -1,6 +1,6 @@
 package com.turkcell.rencar.ui.map
 
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.VehicleUi
 import org.maplibre.android.geometry.LatLng
 
 /**
@@ -20,7 +20,7 @@ data class MapUiState(
     /** İlk konum geldiğinde tek seferlik kamera zoom'unun yapıldığını işaretler. */
     val hasCenteredOnUser: Boolean = false,
     /** GET /vehicles'tan gelen müsait araçlar; harita üzerinde fiyat balonu olarak çizilir. */
-    val vehicles: List<VehicleResponse> = emptyList(),
+    val vehicles: List<VehicleUi> = emptyList(),
     /** Araç listesi yükleniyor mu (tekrarlı istekleri engellemek için de kullanılır). */
     val isLoadingVehicles: Boolean = false,
     /** Araç yüklemesi başarısızsa kullanıcıya gösterilecek mesaj (yoksa null). */
@@ -39,7 +39,7 @@ data class MapUiState(
      * Kullanıcıya en yakın MÜSAİT araç (konum varsa mesafeye göre, yoksa listedeki ilki).
      * "En Yakın Aracı Bul" butonu bu araca kamerayı taşır ve detayını açar.
      */
-    val nearestVehicle: VehicleResponse? = null,
+    val nearestVehicle: VehicleUi? = null,
     /** En yakın araca düz mesafe (metre); konum yoksa null. Alt kart altyazısındaki ~dk buradan tahmin edilir. */
     val nearestDistanceMeters: Float? = null,
     /**

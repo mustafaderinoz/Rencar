@@ -3,7 +3,7 @@ package com.turkcell.rencar.ui.vehicledetail
 import android.location.Location
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.turkcell.rencar.data.remote.dto.VehicleResponse
+import com.turkcell.rencar.data.model.VehicleUi
 import com.turkcell.rencar.data.repository.VehicleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.IOException
@@ -68,7 +68,7 @@ class VehicleDetailViewModel @Inject constructor(
     }
 
     /** Kullanıcı konumu ↔ araç konumu arası düz mesafeyi (metre) hesaplar; konum yoksa null. */
-    private fun distanceTo(vehicle: VehicleResponse, userLat: Double?, userLng: Double?): Float? {
+    private fun distanceTo(vehicle: VehicleUi, userLat: Double?, userLng: Double?): Float? {
         if (userLat == null || userLng == null) return null
         val results = FloatArray(1)
         Location.distanceBetween(userLat, userLng, vehicle.latitude, vehicle.longitude, results)

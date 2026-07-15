@@ -2,6 +2,21 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 
 ---
 
+### Minimum Değişiklik İlkesi (Mimari Yön · üst-düzey kabul kriteri)
+
+- Seçim: **Mimari kararlar, backend/kütüphane değişikliklerinde kodun MİNİMUM değişmesini sağlayacak şekilde alınır.** Dış değişimin etkisi tek bir sınıra hapsedilir.
+
+- Son Güncelleme Tarihi: 14.07.2026
+
+- Sebep: Dış değişimlerin (API şeması, base URL, kütüphane sürümü) yayılma yüzeyi daraltılmalı. Somut uygulamalar:
+  - **Base URL / endpoint** → tek `BuildConfig.BASE_URL` + `di/NetworkModule` (URL değişimi = 1 satır).
+  - **API şeması** → DTO'lar `data/remote/dto`'da izole; UI'a DTO doğrudan verilmez. DTO → model dönüşümü **ayrı bir mapper katmanında** yapılır (repository'nin içinde değil). Additive alanlar nullable-default ile, breaking alanlar mapper katmanında emilir.
+  - **Kütüphane** → kullanım repository/di ardında; UI kütüphaneye doğrudan bağımlı kalmaz.
+
+- Not: Bu ilke tüm mimari kararların üstünde bir kabul kriteridir; bir karar bu ilkeyi ihlal ediyorsa gerekçelendirilmelidir.
+
+---
+
 ### Dependency Injection Kütüphanesi
 
 - Seçim*: **Hilt**
@@ -79,13 +94,28 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 
 ### Katman Derinliği (Data)
 
-- Seçim: **data + repository** (ViewModel → Repository → ApiService)
+- Seçim: **data + repository + ayrı mapper katmanı** (ViewModel → Repository → ApiService; **DTO → model dönüşümü repository'nin DIŞINDA, kendi mapper katmanında** yapılır).
 
-- Son Güncelleme Tarihi: 09.07.2026
+- Son Güncelleme Tarihi: 14.07.2026 (ilk: 09.07.2026)
 
-- Alternatifler: **domain katmanı + UseCase** (Clean Architecture)
+- Alternatifler: **domain + UseCase tier yığını** (tam Clean Architecture)
 
-- Sebep: AGENTS §4.6 minimal soyutlama varsayılanıyla uyumlu; ayrı domain/UseCase katmanı eklenmez.
+- Sebep: DTO'lar (API şeması) UI'a doğrudan sızmamalı; DTO → UI/domain modeli dönüşümü **ayrı bir mapper katmanında** (kendi paketi/sınıfı) yapılır (anti-corruption sınırı). Mapping mantığı repository'nin İÇİNE yazılmaz; repository yalnızca mapper'ı çağırır. Böylece backend şema değişikliği tek noktada (mapper katmanı) emilir; repository/ViewModel/UI etkilenmez ("Minimum Değişiklik İlkesi").
+
+- **Kural (14.07.2026 güncellemesi):** DTO→model mapping'i **ayrı bir katmanda** (kendi mapper paketi) yapılır; bu var olan mapper/model katmanı serbestçe değiştirilebilir. Ancak bunun ötesinde **+1 yeni mimari katman** (ör. UseCase tier'ı) EKLENMEZ — izolasyon mapper katmanıyla sınırlıdır. Bu kural, önceki *"ayrı domain/mapping katmanı eklenmez"* kararının yerini alır. (AGENTS §4.6 "usecase/domain **katmanı** varsayılan olarak eklenmez" ile uyum: eklenen şey tam bir domain/UseCase tier'ı değil, ince bir mapper/model katmanıdır.)
+
+
+### Vehicle Akışı — DTO İzolasyonu
+
+- Seçim: **`VehicleResponse` (DTO) UI'a doğrudan verilmez; ayrı bir mapper katmanı (`VehicleMapper`) `VehicleResponse` → `VehicleUi` (model) çevirir.** Repository yalnızca mapper'ı çağırır; Harita + Araç Detay ekranları `VehicleUi` kullanır.
+
+- Son Güncelleme Tarihi: 14.07.2026
+
+- Alternatif (eski durum): DTO'yu doğrudan UiState/composable'a taşımak — **mevcut kod böyle** (`VehicleResponse` 5 UI dosyasında geçiyor: `MapContract`, `VehicleDetailContract`, `VehicleDetailViewModel`, `VehicleDetailScreen`, `RencarMap`).
+
+- Sebep: "Minimum Değişiklik İlkesi" + "Katman Derinliği" kuralı gereği; breaking API şema değişimi tek noktada (mapper katmanı) emilsin, UI/ViewModel etkilenmesin.
+
+- **Not (14.07.2026): Karar alındı ve KOD HİZALANDI.** Ayrı mapper/model katmanı eklendi (`data/model/*Ui` + `data/mapper/*Mapper`). Tüm akışlar repository üzerinden model döndürür: Vehicle (`VehicleUi`), Reservation/Quote (`QuoteUi`), Auth/Profil/License (`UserUi` + `LicenseVerificationStatus`), Rental (`RentalUi` + `RentalPhotosUi`). Kullanılmayan yanıtlar `Result<Unit>`'e indirgendi (login/reserve/upload/startRental). `ui/` katmanında hiçbir `data.remote.dto` import'u kalmadı (grep ile doğrulandı); `:app:compileDebugKotlin` başarılı.
 
 
 ### API Base URL
