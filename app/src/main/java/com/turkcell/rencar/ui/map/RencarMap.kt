@@ -46,6 +46,9 @@ val DEFAULT_CENTER: LatLng = LatLng(38.51740367746754, 27.161930350129918)
 
 private const val DEFAULT_ZOOM: Double = 10.0
 
+/** Aktif yolculukta araca odaklanınca kullanılan yakınlaştırma seviyesi. */
+private const val RIDE_ZOOM: Double = 15.0
+
 private val ME_MARKER_COLOR = Color.parseColor("#4285F4")
 
 /** OSM raster kaynağı kullanan minimal MapLibre stili (harici sunucu gerektirmez). */
@@ -99,6 +102,10 @@ fun rememberRencarMapController(): RencarMapController = remember { RencarMapCon
  * MapLibre [MapView] ↔ Compose köprüsü. Yalnızca haritayı çizer ve [myLocation] değiştikçe
  * "konumum" noktasını günceller; kamerayı kendisi oynatmaz (bu, controller ile Screen'de
  * yapılır). Önizlemede (LocalInspectionMode) native motor başlatılmaz, placeholder gösterilir.
+ *
+ * Yeniden kullanım: bu composable home'a bağlı değildir; herhangi bir ekranda gömülebilir.
+ * [ridePoint] verildiğinde (Aktif Yolculuk) tek bir araç pin'i çizilir ve kamera onu takip eder
+ * ([myLocation]/[vehicles]'tan bağımsız). ridePoint null iken davranış home ile aynıdır.
  */
 @Composable
 fun RencarMap(
@@ -109,6 +116,7 @@ fun RencarMap(
     controller: RencarMapController? = null,
     vehicles: List<VehicleUi> = emptyList(),
     onVehicleClick: (String) -> Unit = {},
+    ridePoint: LatLng? = null,
 ) {
     // @Preview: MapLibre native motoru render edilemez → basit placeholder.
     if (LocalInspectionMode.current) {
@@ -202,6 +210,19 @@ fun RencarMap(
                     ),
                 )
 
+                // Aktif yolculuk araç pin'i (ridePoint) — merkez-çapalı tekil işaretçi.
+                // Kaynak home'da boş kalır; yalnız ridePoint verildiğinde doldurulur.
+                loaded.addImage("ride-pin", VehicleMarkers.buildRidePin(context))
+                loaded.addSource(GeoJsonSource("ride"))
+                loaded.addLayer(
+                    SymbolLayer("ride-layer", "ride").withProperties(
+                        PropertyFactory.iconImage("ride-pin"),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
+                    ),
+                )
+
                 // Araç balonuna dokunuş: dokunulan noktanın çevresindeki "vehicles-layer"
                 // feature'ları sorgulanır; ilkinin "id"si detay için Screen'e iletilir.
                 val slop = 22f * context.resources.displayMetrics.density
@@ -239,6 +260,23 @@ fun RencarMap(
         updateVehicles(context, style, vehicles, addedIconIds)
     }
 
+    // Aktif yolculuk pin'i -> ridePoint her değiştiğinde işaretçi güncellenir ve kamera onu takip
+    // eder. İlk konumda araca yakınlaşılır (RIDE_ZOOM); sonrasında zoom korunarak kaydırılır
+    // (kullanıcının yaptığı yakınlaştırmayla çakışmamak için).
+    var hasCenteredRide by remember { mutableStateOf(false) }
+    LaunchedEffect(mapAndStyle, ridePoint) {
+        val (map, style) = mapAndStyle ?: return@LaunchedEffect
+        updateRide(style, ridePoint)
+        if (ridePoint != null) {
+            if (!hasCenteredRide) {
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(ridePoint, RIDE_ZOOM))
+                hasCenteredRide = true
+            } else {
+                map.animateCamera(CameraUpdateFactory.newLatLng(ridePoint))
+            }
+        }
+    }
+
     // AndroidView -> Android View ↔ @Composable köprüsü.
     AndroidView(factory = { mapView }, modifier = modifier.fillMaxSize())
 }
@@ -250,6 +288,16 @@ private fun updateMe(style: Style, myLocation: LatLng?) {
         source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
     } else {
         source.setGeoJson(Point.fromLngLat(myLocation.longitude, myLocation.latitude))
+    }
+}
+
+/** "ride" GeoJSON kaynağını aktif yolculuk araç konumuna göre günceller; yoksa pin'i gizler. */
+private fun updateRide(style: Style, point: LatLng?) {
+    val source = style.getSourceAs<GeoJsonSource>("ride") ?: return
+    if (point == null) {
+        source.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+    } else {
+        source.setGeoJson(Point.fromLngLat(point.longitude, point.latitude))
     }
 }
 

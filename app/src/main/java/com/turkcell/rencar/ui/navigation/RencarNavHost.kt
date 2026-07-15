@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.turkcell.rencar.ui.activerental.ActiveRentalScreen
 import com.turkcell.rencar.ui.login.LoginScreen
 import com.turkcell.rencar.ui.home.HomeScreen
 import com.turkcell.rencar.ui.license.LicenseScreen
@@ -164,8 +165,25 @@ fun RencarNavHost(
         ) {
             RentalPhotosScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // "Kiralamayı Başlat" → şimdilik Home'a dön (start ucu henüz çağrılmaz).
-                onStart = { navController.popBackStack() },
+                // "Kiralamayı Başlat" (POST /rentals/{id}/start başarılı) → Aktif Yolculuk ekranı.
+                // Foto ekranı geri yığından çıkar: aktif yolculuktan geri → Home.
+                onStart = { rentalId ->
+                    navController.navigate(RencarDestinations.activeRentalRoute(rentalId)) {
+                        popUpTo(RencarDestinations.RENTAL_PHOTOS_ROUTE) { inclusive = true }
+                    }
+                },
+            )
+        }
+        // Aktif Yolculuk: rentalId path argümanını taşır (ActiveRentalViewModel SavedStateHandle ile
+        // okur). GET /rentals/active poll + Socket.IO canlı konum; "Kiralamayı Bitir" → POST finish.
+        composable(
+            route = RencarDestinations.ACTIVE_RENTAL_ROUTE,
+            arguments = listOf(
+                navArgument(RencarDestinations.ACTIVE_RENTAL_ARG_RENTAL_ID) { type = NavType.StringType },
+            ),
+        ) {
+            ActiveRentalScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }

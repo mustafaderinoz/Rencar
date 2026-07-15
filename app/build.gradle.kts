@@ -54,6 +54,11 @@ dependencies {
     implementation(libs.maplibre)
     implementation(libs.maplibre.annotation)
     implementation(libs.play.services.location)
+    // Aktif yolculuk canlı araç konumu (Socket.IO, /ws/locations). org.json Android platformunda
+    // hazır geldiğinden kütüphanenin kopyası hariç tutulur (aksi halde "Duplicate class org.json").
+    implementation(libs.socket.io) {
+        exclude(group = "org.json", module = "json")
+    }
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

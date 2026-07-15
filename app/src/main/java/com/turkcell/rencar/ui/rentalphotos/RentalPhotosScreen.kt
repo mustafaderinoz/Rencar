@@ -63,7 +63,7 @@ private val RencarBlue = LightPrimary
 @Composable
 fun RentalPhotosScreen(
     onNavigateBack: () -> Unit,
-    onStart: () -> Unit,
+    onStart: (rentalId: String) -> Unit,
     viewModel: RentalPhotosViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -117,10 +117,10 @@ fun RentalPhotosScreen(
         }
     }
 
-    // Yolculuk başladı (ACTIVE) → Home'a geç, bayrağı tüket (tekrar geçişi önler).
+    // Yolculuk başladı (ACTIVE) → Aktif Yolculuk ekranına geç (rentalId ile), bayrağı tüket.
     LaunchedEffect(uiState.started) {
         if (uiState.started) {
-            onStart()
+            uiState.rentalId?.let { onStart(it) }
             viewModel.onStartedHandled()
         }
     }

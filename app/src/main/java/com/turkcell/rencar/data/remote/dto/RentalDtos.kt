@@ -65,3 +65,41 @@ data class RentalPhoto(
     val imageUrl: String,
     val createdAt: String,
 )
+
+/**
+ * GET /rentals/active 200 yanıtı (ActiveRentalResponseDto) — aktif yolculuğun ANLIK durumu.
+ * Aktif Kiralama ekranı bunu periyodik çeker: [currentCost] "Anlık ücret", [distanceKm] "Mesafe",
+ * [elapsedSeconds] geçen süre (yerel sayaç bununla resync edilir), [startFee] bilgi kartındaki
+ * başlangıç ücreti. Kullanılmayan alanlar (userId, endedAt, serviceFee, discountAmount vb.)
+ * okunmaz (Json.ignoreUnknownKeys). Sayısal alanlar "number" olduğundan Double alınır.
+ */
+@Serializable
+data class ActiveRentalResponse(
+    val id: String,
+    val vehicle: RentalVehicleSummary,
+    val plan: String,
+    val startedAt: String,
+    val startFee: Double = 0.0,
+    val distanceKm: Double = 0.0,
+    val elapsedSeconds: Double = 0.0,
+    val currentCost: Double = 0.0,
+    val status: String,
+)
+
+/**
+ * POST /rentals/{id}/finish 200 yanıtı (FinishRentalResponseDto) — bitişteki ücret dökümü.
+ * Aktif Kiralama ekranı bitiş özetinde kullanır: [usageFee] kullanım, [startFee] açılış,
+ * [totalPrice] varsa toplam (null → usageFee+startFee'den türetilir). Ödeme bu adımda yapılmaz.
+ */
+@Serializable
+data class FinishRentalResponse(
+    val id: String,
+    val vehicle: RentalVehicleSummary,
+    val plan: String,
+    val startFee: Double = 0.0,
+    val usageFee: Double = 0.0,
+    val distanceKm: Double = 0.0,
+    val elapsedSeconds: Double = 0.0,
+    val totalPrice: Double? = null,
+    val status: String,
+)
