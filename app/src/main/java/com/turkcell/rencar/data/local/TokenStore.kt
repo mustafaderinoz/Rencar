@@ -33,6 +33,9 @@ class TokenStore @Inject constructor(
     /** Interceptor için tek seferlik okuma. */
     suspend fun currentAccessToken(): String? = dataStore.data.first()[accessTokenKey]
 
+    /** SessionManager'ın refresh çağrısı için tek seferlik okuma (POST /auth/refresh gövdesi). */
+    suspend fun currentRefreshToken(): String? = dataStore.data.first()[refreshTokenKey]
+
     suspend fun clear() {
         dataStore.edit { it.clear() }
     }

@@ -92,6 +92,23 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - Sebep: Coroutine/Flow tabanlı asenkron erişim; access + refresh token burada tutulur, auth interceptor buradan okur.
 
 
+### Oturum Yönetimi & Token Yenileme (SessionManager)
+
+- Seçim: **`SessionManager` + OkHttp `Authenticator` (TokenAuthenticator) ile otomatik token yenileme.** Herhangi bir Retrofit çağrısı **401** dönünce access token, eldeki refresh token'la (`POST /auth/refresh`, rotation) sessizce yenilenir ve istek taze token'la BİR kez tekrar denenir. Yenileme **tek-uçuşludur** (`Mutex` — aynı anda gelen çok sayıda 401 için tek ağ çağrısı). Refresh de başarısızsa token'lar temizlenir ve `SessionManager.forcedLogout` olayı yayınlanır; `RencarNavHost` bunu dinleyip kullanıcıyı Login'e atar (backstack temizlenir).
+
+- Son Güncelleme Tarihi: 15.07.2026
+
+- Alternatifler: **Her istekte 401'i ViewModel'de ele alıp elle login'e yönlendirme** (kod tekrarı; her ekran ayrı ayrı ilgilenir), **response interceptor içinde yenileme** (OkHttp sözleşmesi 401 için `Authenticator`'dır; tekrar-deneme ve `priorResponse` döngü koruması hazır gelir).
+
+- Sebep ("Minimum Değişiklik İlkesi"): Token yenileme tek bir sınıra (`Authenticator` + `SessionManager`) hapsedildi; ViewModel/UI'daki mevcut 401 mesajları ve akışlar **değişmedi** (Faz 1 sıfır UI dokunuşu). Backend refresh ucu zaten mevcut (§2.2'ye uygun; uydurma yok).
+
+- **Dairesel bağımlılık çözümü:** `SessionManager`'ın kullandığı `RefreshApi`, DI'da ana istemciden AYRI ve **`AuthInterceptor`/`Authenticator` İÇERMEYEN** sade bir OkHttp/Retrofit'ten üretilir (`di/NetworkModule.provideRefreshApi`). Böylece (a) `Authenticator → SessionManager → RefreshApi` grafiği asiklik olur, (b) refresh çağrısı 401 dönse bile Authenticator'a uğramaz, kendini tetikleyemez. Sonsuz döngü ayrıca `priorResponse` sayımıyla (en çok 1 tekrar) sınırlanır.
+
+- **Dokunulan/eklenen dosyalar:** yeni `data/remote/api/RefreshApi`, `data/remote/session/SessionManager`, `data/remote/interceptor/TokenAuthenticator`, `ui/MainViewModel`; güncellenen `data/remote/dto/AuthDtos` (RefreshTokenRequest), `data/local/TokenStore` (currentRefreshToken), `di/NetworkModule`, `ui/navigation/RencarNavHost`.
+
+- Not (15.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** `RideLocationClient`'in socket `connect_error → refresh → reconnect` dalı da geri bağlandı (aşağıdaki "Aktif Yolculuk" sapma notuna bakınız).
+
+
 ### Katman Derinliği (Data)
 
 - Seçim: **data + repository + ayrı mapper katmanı** (ViewModel → Repository → ApiService; **DTO → model dönüşümü repository'nin DIŞINDA, kendi mapper katmanında** yapılır).
@@ -182,7 +199,7 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - Sebep: "Anlık ücret API ile hesaplanmalı" → sunucudaki `currentCost` tek doğruluk kaynağıdır (istemci fiyat hesaplamaz). Harita canlılığı için socket sözleşmesi sunucu tarafından `/ws/locations`+`my-vehicle` olarak verildi. Kütüphane kullanımı **repository/di ardında** (`data/remote/socket/RideLocationClient` → `RentalRepository.vehiclePositionStream()`); UI yalnız `Flow<VehiclePoint>` görür, `io.socket`'e bağımlı kalmaz (decisions.md "Minimum Değişiklik" + "Kütüphane"). DTO izolasyonu korunur: `ActiveRentalResponse`/`FinishRentalResponse` → `ActiveRentalUi`/`RentalReceiptUi` mapper katmanında çevrilir.
 
 - **Örnek koddan sapmalar (§2.2 uydurmak yasak):**
-  - `RideLocationClient` — projede `SessionManager`/token-refresh ucu YOK; örnekteki oturum-tazeleme dalı çıkarıldı (Socket.IO `reconnection`'ına bırakıldı). `TokenStore.accessToken()` yok → suspend `currentAccessToken()` kullanıldı. `BASE_URL` sonda `/` içerdiğinden namespace eklenmeden `trimEnd('/')` ile kırpıldı.
+  - `RideLocationClient` — **GÜNCELLENDİ (15.07.2026):** Artık `SessionManager` var; örnekteki `connect_error → refreshSession() → reconnect` dalı geri kondu. Token socket kurulurken okunduğundan, handshake reddinde taze token alınıp socket yeniden kurulur; deneme sayısı `MAX_AUTH_RETRIES` ile sınırlı, başarılı bağlantıda (`EVENT_CONNECT`) sıfırlanır. `TokenStore.accessToken()` yok → suspend `currentAccessToken()` kullanıldı. `BASE_URL` sonda `/` içerdiğinden namespace eklenmeden `trimEnd('/')` ile kırpıldı. (Oturum yönetimi kararı için bkz. "Oturum Yönetimi & Token Yenileme (SessionManager)".)
   - **"Kilitle / Aç" butonu** — openapi.json'da kilit/aç (lock/unlock) ucu YOK. Buton **yalnız yerel görsel toggle**tır (ağ çağrısı yapmaz); gerçek uç eklenince bağlanır. Kullanıcı onayıyla bu davranış seçildi.
   - **Ödeme** — "Kiralamayı Bitir" (`POST /rentals/{id}/finish`) sonrası ekran ücret dökümüyle KALIR; `POST /rentals/{id}/pay` bu iş kapsamında değildir (ödeme ekranı ayrı iş).
 

@@ -4,13 +4,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.turkcell.rencar.ui.MainViewModel
 import com.turkcell.rencar.ui.activerental.ActiveRentalScreen
 import com.turkcell.rencar.ui.login.LoginScreen
 import com.turkcell.rencar.ui.home.HomeScreen
@@ -33,7 +36,19 @@ import com.turkcell.rencar.ui.selfie.SelfieScreen
 fun RencarNavHost(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
+    mainViewModel: MainViewModel = hiltViewModel(),
 ) {
+    // Sert logout (refresh de öldü → SessionManager oturumu kapattı): tüm backstack temizlenip
+    // Login'e dönülür. Sessiz token yenileme başarılı olduğunda bu olay HİÇ yayınlanmaz.
+    LaunchedEffect(Unit) {
+        mainViewModel.forcedLogout.collect {
+            navController.navigate(RencarDestinations.LOGIN) {
+                popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = RencarDestinations.ONBOARDING,
