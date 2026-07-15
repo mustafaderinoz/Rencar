@@ -36,10 +36,9 @@ class VehicleDetailViewModel @Inject constructor(
         when (intent) {
             is VehicleDetailIntent.Load -> load(intent)
             VehicleDetailIntent.Retry -> lastLoad?.let { load(it) }
-            // Rezervasyon/kilit uçları (POST /reservations vb.) bu iş kapsamında bağlanmadı (§4.6):
-            // butonlar yalnızca durum (status) ile aktif/pasif çizilir.
+            // Rezervasyon ucu (POST /reservations) bu iş kapsamında bağlanmadı (§4.6):
+            // buton yalnızca durum (status) ile aktif/pasif çizilir; navigasyonu Screen katmanı yapar.
             VehicleDetailIntent.ReserveClicked -> Unit
-            VehicleDetailIntent.UnlockClicked -> Unit
         }
     }
 

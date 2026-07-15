@@ -169,3 +169,23 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - Alternatifler: **Sadece mesafe (m/km)** göster, **altyazıyı kaldır**
 
 - Sebep: Tasarımdaki "Kadıköy çevresinde · 3 dk uzaklıkta" satırının RenCar API'sinde KARŞILIĞI YOK (geocoding/semt ucu yoktur — §2.2). Mahalle adı cihazın kendi Geocoder'ıyla (IO dispatcher, bloklayıcı API) çözülür; en yakın araca ~dk mesafeden tahmin edilir. Geocoder yoksa/başarısızsa altyazı sessizce gizlenir. Üstteki arama çubuğu da aynı nedenle DEKORATİFtir (arama ucu yok).
+
+
+### Aktif Yolculuk — Canlı Konum (Socket.IO) + Anlık Ücret (Poll)
+
+- Seçim: **Araç canlı konumu `Socket.IO` (`io.socket:socket.io-client:2.1.0`) ile `/ws/locations` namespace'inden `my-vehicle` event'iyle alınır; anlık ücret/mesafe/geçen süre `GET /rentals/active` (`ActiveRentalResponseDto`) periyodik poll'üyle (~4 sn) beslenir.** Geçen süre ekranda 1 sn'lik yerel sayaçla akıp her poll'de sunucudaki `elapsedSeconds` ile senkronlanır.
+
+- Son Güncelleme Tarihi: 15.07.2026
+
+- Alternatifler: **Sadece poll (harita canlılığı düşük)**, **WebSocket'i doğrudan OkHttp ile (sözleşme Socket.IO)**
+
+- Sebep: "Anlık ücret API ile hesaplanmalı" → sunucudaki `currentCost` tek doğruluk kaynağıdır (istemci fiyat hesaplamaz). Harita canlılığı için socket sözleşmesi sunucu tarafından `/ws/locations`+`my-vehicle` olarak verildi. Kütüphane kullanımı **repository/di ardında** (`data/remote/socket/RideLocationClient` → `RentalRepository.vehiclePositionStream()`); UI yalnız `Flow<VehiclePoint>` görür, `io.socket`'e bağımlı kalmaz (decisions.md "Minimum Değişiklik" + "Kütüphane"). DTO izolasyonu korunur: `ActiveRentalResponse`/`FinishRentalResponse` → `ActiveRentalUi`/`RentalReceiptUi` mapper katmanında çevrilir.
+
+- **Örnek koddan sapmalar (§2.2 uydurmak yasak):**
+  - `RideLocationClient` — projede `SessionManager`/token-refresh ucu YOK; örnekteki oturum-tazeleme dalı çıkarıldı (Socket.IO `reconnection`'ına bırakıldı). `TokenStore.accessToken()` yok → suspend `currentAccessToken()` kullanıldı. `BASE_URL` sonda `/` içerdiğinden namespace eklenmeden `trimEnd('/')` ile kırpıldı.
+  - **"Kilitle / Aç" butonu** — openapi.json'da kilit/aç (lock/unlock) ucu YOK. Buton **yalnız yerel görsel toggle**tır (ağ çağrısı yapmaz); gerçek uç eklenince bağlanır. Kullanıcı onayıyla bu davranış seçildi.
+  - **Ödeme** — "Kiralamayı Bitir" (`POST /rentals/{id}/finish`) sonrası ekran ücret dökümüyle KALIR; `POST /rentals/{id}/pay` bu iş kapsamında değildir (ödeme ekranı ayrı iş).
+
+- **Harita componentleştirme:** `ui/map/RencarMap` zaten bağımsız composable'dı; home'a bağlı değildi. Opsiyonel `ridePoint: LatLng?` parametresi eklendi (tekil araç pin'i + kamera takibi); ridePoint null iken home davranışı değişmez. Böylece aynı harita hem Home hem Aktif Yolculuk ekranında kullanılır. Pin bitmap'i `VehicleMarkers.buildRidePin` (mavi daire + beyaz araç silüeti).
+
+- Not (15.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Yeni ekran `ui/activerental/*` (MVI §4 kalıbı: Contract+ViewModel+Screen). Akış: RentalPhotos "Kiralamayı Başlat" (`POST /rentals/{id}/start`) → `active_rental/{rentalId}` (foto ekranı backstack'ten çıkar). Tarih ayrıştırma minSdk 24 + desugaring kapalı olduğundan `SimpleDateFormat` ('X' ISO ofseti) ile yapıldı (java.time API 26 ister).

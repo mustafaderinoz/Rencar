@@ -69,6 +69,16 @@ object RencarDestinations {
     fun rentalPhotosRoute(vehicleId: String, plan: String): String =
         "$RENTAL_PHOTOS/${Uri.encode(vehicleId)}/${Uri.encode(plan)}"
 
+    // 09 Aktif Yolculuk — "Kiralamayı Başlat" (POST /rentals/{id}/start) sonrası açılır. Aktif
+    // kiralama id'sini path argümanı taşır: "active_rental/{rentalId}". Ekran GET /rentals/active
+    // ile anlık durumu çeker; harita canlı konumu Socket.IO'dan alır.
+    const val ACTIVE_RENTAL = "active_rental"
+    const val ACTIVE_RENTAL_ARG_RENTAL_ID = "rentalId"
+    const val ACTIVE_RENTAL_ROUTE = "$ACTIVE_RENTAL/{$ACTIVE_RENTAL_ARG_RENTAL_ID}"
+
+    /** Somut aktif yolculuk rotasını üretir ([Uri.encode] ile güvenli kodlama). */
+    fun activeRentalRoute(rentalId: String): String = "$ACTIVE_RENTAL/${Uri.encode(rentalId)}"
+
     // Home içindeki nested NavHost sekme rotaları (MainScreen). İçerikler şimdilik placeholder.
     const val MAP = "map"
     const val HISTORY = "history"

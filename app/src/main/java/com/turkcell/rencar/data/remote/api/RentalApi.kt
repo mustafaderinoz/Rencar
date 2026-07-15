@@ -1,12 +1,15 @@
 package com.turkcell.rencar.data.remote.api
 
+import com.turkcell.rencar.data.remote.dto.ActiveRentalResponse
 import com.turkcell.rencar.data.remote.dto.CreateRentalRequest
+import com.turkcell.rencar.data.remote.dto.FinishRentalResponse
 import com.turkcell.rencar.data.remote.dto.RentalPhotosState
 import com.turkcell.rencar.data.remote.dto.RentalResponse
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
+import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
@@ -44,6 +47,20 @@ interface RentalApi {
      */
     @POST("rentals/{id}/start")
     suspend fun start(@Path("id") rentalId: String): RentalResponse
+
+    /**
+     * Kullanıcının AKTİF yolculuğunun anlık durumu (RentalController_active). Aktif Kiralama ekranı
+     * periyodik çeker: currentCost/distanceKm/elapsedSeconds canlı ilerler. Aktif yolculuk yoksa 404.
+     */
+    @GET("rentals/active")
+    suspend fun getActiveRental(): ActiveRentalResponse
+
+    /**
+     * ACTIVE yolculuğu bitirir ve kesin ücret dökümünü döner (RentalController_finish). Araç
+     * AVAILABLE olur; ödeme ayrı adımdır (POST /rentals/{id}/pay — bu iş kapsamında değil).
+     */
+    @POST("rentals/{id}/finish")
+    suspend fun finish(@Path("id") rentalId: String): FinishRentalResponse
 
     /**
      * PREPARING (henüz başlamamış) kiralamayı iptal eder (RentalController_cancel, 204); araç
