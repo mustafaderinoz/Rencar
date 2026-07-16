@@ -1,5 +1,6 @@
 package com.turkcell.rencar.ui.payment
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -35,12 +36,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 // androidx.hilt 1.3.0: hiltViewModel() kanonik olarak bu pakette (decisions.md).
@@ -704,15 +709,44 @@ private fun BrandBadge(brand: String) {
             .width(48.dp)
             .height(32.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color.White)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = if (isMc) "MC" else "VISA",
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (isMc) Color(0xFFEB6C1E) else Color(0xFF1A1F71),
+        if (isMc) MastercardMark() else VisaMark()
+    }
+}
+
+/** VISA — klasik mavi italik wordmark. */
+@Composable
+private fun VisaMark() {
+    Text(
+        text = "VISA",
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Black,
+        fontStyle = FontStyle.Italic,
+        letterSpacing = 0.5.sp,
+        color = Color(0xFF1A1F71),
+    )
+}
+
+/** Mastercard — kırmızı + amber iç içe geçen iki halka; kesişim turuncu. */
+@Composable
+private fun MastercardMark() {
+    Canvas(modifier = Modifier.size(width = 34.dp, height = 22.dp)) {
+        val r = size.height / 2f
+        val cy = size.height / 2f
+        val cxLeft = size.width / 2f - r * 0.5f
+        val cxRight = size.width / 2f + r * 0.5f
+        drawCircle(color = Color(0xFFEB001B), radius = r, center = Offset(cxLeft, cy))
+        drawCircle(color = Color(0xFFF79E1B), radius = r, center = Offset(cxRight, cy))
+        // Kesişim (vesica) yaklaşık turuncu bir elipsle vurgulanır.
+        val lensW = r * 0.95f
+        val lensH = r * 1.7f
+        drawOval(
+            color = Color(0xFFFF5F00),
+            topLeft = Offset(size.width / 2f - lensW / 2f, cy - lensH / 2f),
+            size = Size(lensW, lensH),
         )
     }
 }

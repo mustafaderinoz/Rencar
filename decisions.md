@@ -234,3 +234,30 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** yeni `data/remote/dto/PaymentDtos`, `data/remote/api/CardApi`, `data/remote/api/WalletApi`, `data/model/PaymentModels`, `data/mapper/PaymentMapper`, `data/repository/PaymentRepository`, `ui/payment/{PaymentContract,PaymentViewModel,PaymentScreen}`; güncellenen `data/remote/dto/RentalDtos` (RentalResponse döküm alanları), `data/remote/api/RentalApi` (getRental+pay), `di/NetworkModule` (CardApi/WalletApi), `ui/navigation/{RencarDestinations,RencarNavHost}`, `ui/activerental/ActiveRentalScreen`.
 
 - Not (16.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.**
+
+---
+
+### Cüzdan Ekranı (Bakiye + İşlemler + Kart Yönetimi) — `GET /wallet`, `POST /wallet/topup`, `/cards`
+
+- Seçim: **Home'un "Cüzdan" sekmesi (`RencarDestinations.WALLET`) placeholder'dan gerçek MVI ekranına yükseltildi (§4.6).** Ekran: mavi bakiye kartı + **Bakiye Yükle** (ekran içi pop-up, `POST /wallet/topup`, 10–5.000 ₺), **Kayıtlı kartlar** (marka+•••• son4+SKT; "Varsayılan yap" `PATCH /cards/{id}/default`, "Sil" onay pop-up'ıyla `DELETE /cards/{id}`, "+ Ekle" pop-up `POST /cards`), **Son işlemler** (`GET /wallet` → transactions).
+
+- Son Güncelleme Tarihi: 16.07.2026
+
+- Alternatifler: **Bakiye yükleme/kart ekleme için ayrı sayfa** — Ödeme ekranıyla tutarlı kalmak için pop-up (`androidx.compose.ui.window.Dialog`) seçildi.
+
+- Sebep: Tasarımdaki cüzdan ekranı; kullanıcı talebi "bakiye yükle + kart ekle + varsayılan/sil". Kart CRUD zaten Ödeme ekranı için **mevcut** (`CardApi` + `CardUi` + `PaymentMapper` + `PaymentRepository`); tekrar yazılmadı — `WalletViewModel` bu iş için **`PaymentRepository`'yi yeniden kullanır** ("Minimum Değişiklik", kod tekrarı yok). Cüzdan bakiyesi/işlem/yükleme yeni `WalletRepository` ardındadır.
+
+- **DTO izolasyonu korunur (decisions.md "Katman Derinliği"):** `WalletResponse` (PaymentDtos içinde) **additive** olarak `transactions` kazandı (default `emptyList` → ödeme akışının `toBalance()`'ı etkilenmez); yeni `WalletTransaction` + `TopupRequest` DTO'ları eklendi. `WalletResponse` → `WalletUi`/`WalletTransactionUi` **`WalletMapper`** ile çevrilir; `ui/wallet/*` katmanında `data.remote.dto` importu yoktur.
+
+- **Yeni bağımlılık YOK.** Mevcut Retrofit + kotlinx.serialization + Hilt + Compose yeterli.
+
+- **Kararlar/sapmalar:**
+  - **Göreli tarih (§ "Mahalle/tarih" kalıbı):** işlem tarihi "Bugün · 14:32 / Dün · 09:10 / dd.MM.yyyy · HH:mm" olarak mapper'da üretilir. minSdk 24 + desugaring kapalı → java.time yerine `SimpleDateFormat` ('X' ISO ofseti) + `Calendar` (RentalMapper kalıbı).
+  - **Para biçimi:** cüzdan mock'una uygun Türkçe biçim `₺%,.2f` ("₺340,00"); işlem tutarları işaretli ("+₺200,00" / "−₺110,50", `isCredit` renklendirmesi). (Not: Ödeme ekranı `%.2f ₺` dot-biçimi kullanır — iki ekranın mock'ları farklı; her ekran kendi mock'una sadık.)
+  - **Tutar aralığı client kapısı:** Yükle butonu 10–5.000 ₺ dışında pasif; sunucu da 400 döner.
+  - Açılışta cüzdan + kartlar **paralel** yüklenir; cüzdan kritiktir (başarısızsa tam ekran hata + tekrar dene), kart hatası sessizce boş sayılır.
+  - Navigasyon yok — ekran Home sekmesi içinde kendi kendine yeten (`hiltViewModel()`); `RencarDestinations`/`RencarNavHost` değişmedi.
+
+- **Dokunulan/eklenen dosyalar:** yeni `data/model/WalletModels`, `data/mapper/WalletMapper`, `data/repository/WalletRepository`, `ui/wallet/{WalletContract,WalletViewModel,WalletScreen}`; güncellenen `data/remote/dto/PaymentDtos` (WalletResponse.transactions + WalletTransaction + TopupRequest), `data/remote/api/WalletApi` (topup), `ui/icons/RencarIcons` (Plus), `ui/home/HomeScreen` (placeholder → WalletScreen).
+
+- Not (16.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.**

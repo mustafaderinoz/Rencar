@@ -42,12 +42,37 @@ data class CreateCardRequest(
 )
 
 /**
- * GET /wallet cevabı (WalletResponseDto). Ödeme ekranı yalnız [balance]'ı (cüzdan bakiyesi) okur;
- * transactions listesi bu akışta kullanılmaz (Json.ignoreUnknownKeys ile atlanır).
+ * GET /wallet + POST /wallet/topup cevabı (WalletResponseDto). Ödeme ekranı yalnız [balance]'ı okur;
+ * Cüzdan ekranı ek olarak [transactions] (son 20 işlem, yeniden eskiye) gösterir. Alan additive ve
+ * default'ludur; eski çağıranlar (ödeme akışı) etkilenmez (decisions.md → "Minimum Değişiklik").
  */
 @Serializable
 data class WalletResponse(
     val balance: Double = 0.0,
+    val transactions: List<WalletTransaction> = emptyList(),
+)
+
+/**
+ * Cüzdan işlem hareketi (WalletTransactionDto). [type] TOPUP | RENTAL_PAYMENT | REFERRAL_BONUS;
+ * [amount] işaretli tutar (yükleme/bonus +, ödeme −); [description] kullanıcıya gösterilen açıklama.
+ */
+@Serializable
+data class WalletTransaction(
+    val id: String,
+    val type: String,
+    val amount: Double,
+    val description: String = "",
+    val createdAt: String = "",
+    val rentalId: String? = null,
+)
+
+/**
+ * POST /wallet/topup gövdesi (TopupDto). [amount] yüklenecek tutar (10–5000 TL aralığında);
+ * simülasyon — gerçek tahsilat yapılmaz, tutar doğrudan bakiyeye eklenir.
+ */
+@Serializable
+data class TopupRequest(
+    val amount: Double,
 )
 
 /**
