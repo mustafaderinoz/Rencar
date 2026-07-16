@@ -898,6 +898,34 @@ object RencarIcons {
         }.build()
     }
 
+    /** Artı (+) — "Bakiye Yükle" ve "+ Ekle" (kart) butonları. */
+    val Plus: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarPlus",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(19f, 13f)
+                horizontalLineToRelative(-6f)
+                verticalLineToRelative(6f)
+                horizontalLineToRelative(-2f)
+                verticalLineToRelative(-6f)
+                horizontalLineTo(5f)
+                verticalLineToRelative(-2f)
+                horizontalLineToRelative(6f)
+                verticalLineTo(5f)
+                horizontalLineToRelative(2f)
+                verticalLineToRelative(6f)
+                horizontalLineToRelative(6f)
+                verticalLineToRelative(2f)
+                close()
+            }
+        }.build()
+    }
+
     /** Kapıdan çıkış oku (logout) — profil "Çıkış yap" satırı. */
     val Logout: ImageVector by lazy {
         ImageVector.Builder(

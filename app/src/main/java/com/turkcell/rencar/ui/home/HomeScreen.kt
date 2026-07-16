@@ -21,6 +21,7 @@ import com.turkcell.rencar.ui.map.MapScreen
 import com.turkcell.rencar.ui.navigation.RencarDestinations
 import com.turkcell.rencar.ui.profile.ProfileScreen
 import com.turkcell.rencar.ui.theme.RenCarTheme
+import com.turkcell.rencar.ui.wallet.WalletScreen
 
 /**
  * Alt navigasyonlu ana kabuk: [Scaffold] + [RencarBottomBar] + sekmelere özel nested
@@ -68,7 +69,7 @@ fun HomeScreen(
                 MapScreen(onNavigateToReservation = onNavigateToReservation)
             }
             composable(RencarDestinations.HISTORY) { PlaceholderScreen("Geçmiş") }
-            composable(RencarDestinations.WALLET) { PlaceholderScreen("Cüzdan") }
+            composable(RencarDestinations.WALLET) { WalletScreen() }
             composable(RencarDestinations.PROFILE) { ProfileScreen() }
         }
     }
