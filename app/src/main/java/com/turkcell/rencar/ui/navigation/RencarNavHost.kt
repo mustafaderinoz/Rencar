@@ -21,6 +21,7 @@ import com.turkcell.rencar.ui.license.LicenseScreen
 import com.turkcell.rencar.ui.licensepending.LicensePendingScreen
 import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
+import com.turkcell.rencar.ui.payment.PaymentScreen
 import com.turkcell.rencar.ui.rentalphotos.RentalPhotosScreen
 import com.turkcell.rencar.ui.reservation.RentalPlan
 import com.turkcell.rencar.ui.reservation.ReservationScreen
@@ -199,6 +200,32 @@ fun RencarNavHost(
         ) {
             ActiveRentalScreen(
                 onNavigateBack = { navController.popBackStack() },
+                // "Kiralamayı Bitir" (POST /rentals/{id}/finish) başarılı → Ödeme ekranı. Aktif yolculuk
+                // geri yığından çıkar: ödemeden geri → Home (finish tek yönlüdür).
+                onNavigateToPayment = { rentalId ->
+                    navController.navigate(RencarDestinations.paymentRoute(rentalId)) {
+                        popUpTo(RencarDestinations.ACTIVE_RENTAL_ROUTE) { inclusive = true }
+                    }
+                },
+            )
+        }
+        // Ödeme: rentalId path argümanını taşır (PaymentViewModel SavedStateHandle ile okur). GET
+        // /rentals/{id} (döküm) + GET /cards + GET /wallet; POST /rentals/{id}/pay ile öder.
+        composable(
+            route = RencarDestinations.PAYMENT_ROUTE,
+            arguments = listOf(
+                navArgument(RencarDestinations.PAYMENT_ARG_RENTAL_ID) { type = NavType.StringType },
+            ),
+        ) {
+            PaymentScreen(
+                onNavigateBack = { navController.popBackStack() },
+                // Ödeme başarılı → tüm kiralama akışı temizlenip Home'a (harita) dönülür.
+                onNavigateToHome = {
+                    navController.navigate(RencarDestinations.HOME) {
+                        popUpTo(RencarDestinations.HOME) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
     }

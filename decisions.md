@@ -201,8 +201,36 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Örnek koddan sapmalar (§2.2 uydurmak yasak):**
   - `RideLocationClient` — **GÜNCELLENDİ (15.07.2026):** Artık `SessionManager` var; örnekteki `connect_error → refreshSession() → reconnect` dalı geri kondu. Token socket kurulurken okunduğundan, handshake reddinde taze token alınıp socket yeniden kurulur; deneme sayısı `MAX_AUTH_RETRIES` ile sınırlı, başarılı bağlantıda (`EVENT_CONNECT`) sıfırlanır. `TokenStore.accessToken()` yok → suspend `currentAccessToken()` kullanıldı. `BASE_URL` sonda `/` içerdiğinden namespace eklenmeden `trimEnd('/')` ile kırpıldı. (Oturum yönetimi kararı için bkz. "Oturum Yönetimi & Token Yenileme (SessionManager)".)
   - **"Kilitle / Aç" butonu** — openapi.json'da kilit/aç (lock/unlock) ucu YOK. Buton **yalnız yerel görsel toggle**tır (ağ çağrısı yapmaz); gerçek uç eklenince bağlanır. Kullanıcı onayıyla bu davranış seçildi.
-  - **Ödeme** — "Kiralamayı Bitir" (`POST /rentals/{id}/finish`) sonrası ekran ücret dökümüyle KALIR; `POST /rentals/{id}/pay` bu iş kapsamında değildir (ödeme ekranı ayrı iş).
+  - **Ödeme** — ~~"Kiralamayı Bitir" sonrası ekran ücret dökümüyle KALIR; `POST /rentals/{id}/pay` bu iş kapsamında değildir~~ **(16.07.2026 GÜNCELLENDİ — artık ödeme ekranı var; bkz. "Ödeme Ekranı (Cüzdan/Kart + Kart Ekle)" kararı).** Finish başarılı olunca `active_rental` backstack'ten çıkıp `payment/{rentalId}` ekranına otomatik geçilir.
 
 - **Harita componentleştirme:** `ui/map/RencarMap` zaten bağımsız composable'dı; home'a bağlı değildi. Opsiyonel `ridePoint: LatLng?` parametresi eklendi (tekil araç pin'i + kamera takibi); ridePoint null iken home davranışı değişmez. Böylece aynı harita hem Home hem Aktif Yolculuk ekranında kullanılır. Pin bitmap'i `VehicleMarkers.buildRidePin` (mavi daire + beyaz araç silüeti).
 
 - Not (15.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Yeni ekran `ui/activerental/*` (MVI §4 kalıbı: Contract+ViewModel+Screen). Akış: RentalPhotos "Kiralamayı Başlat" (`POST /rentals/{id}/start`) → `active_rental/{rentalId}` (foto ekranı backstack'ten çıkar). Tarih ayrıştırma minSdk 24 + desugaring kapalı olduğundan `SimpleDateFormat` ('X' ISO ofseti) ile yapıldı (java.time API 26 ister).
+
+
+### Ödeme Ekranı (Cüzdan/Kart + Kart Ekle) — `POST /rentals/{id}/pay`
+
+- Seçim: **Kiralama bitince (`POST /rentals/{id}/finish`) otomatik olarak yeni `payment/{rentalId}` ekranına geçilir; kullanıcı cüzdan veya kayıtlı kartla öder (`POST /rentals/{id}/pay`), opsiyonel indirim kodu girer, başarıda Home'a döner.** Kart kaydetme AYRI SAYFA DEĞİL, ekran içi **pop-up (`androidx.compose.ui.window.Dialog`)**: marka (VISA/Mastercard) + son 4 hane + SKT ay/yıl → `POST /cards`.
+
+- Son Güncelleme Tarihi: 16.07.2026
+
+- Alternatifler: **Butonla geçiş** (finish sonrası ActiveRental'da özet kalıp "Ödemeye Geç" butonu) — kullanıcı otomatik geçişi seçti. **Ödeme sonrası ekranda kalma** — kullanıcı Home'a dönüşü seçti.
+
+- Sebep: Tasarımdaki "Yolculuk tamamlandı" başlıklı ödeme ekranı, finish'in doğal devamıdır. Ekran verisini nav argümanıyla taşımak yerine **`GET /rentals/{id}` ile döküm yeniden çekilir** (süreç ölümüne dayanıklı; tek doğruluk kaynağı sunucu). "Kiralama ücreti" kalemi türetilir: `usageFee = totalPrice − startFee − serviceFee`. Kart yalnız görsel meta (marka+son4+SKT) olarak tutulur — tam kart numarası/CVV backend'de de reddedilir (PCI kapsamı dışı, §2.2 uydurma yok).
+
+- **DTO izolasyonu korunur (decisions.md "Katman Derinliği"):** `PaymentDtos` (CardResponse/CreateCardRequest/WalletResponse/PayRentalRequest/PayRentalResponse) → `PaymentModels` (CardUi/PaymentReceiptUi/PaymentResultUi) `PaymentMapper` ile çevrilir; `ui/payment/*` katmanında `data.remote.dto` importu yoktur. `RentalResponse` DTO'suna döküm alanları (totalPrice/serviceFee/durationMinutes/distanceKm/paymentStatus) **additive + nullable-default** eklendi ("Minimum Değişiklik").
+
+- **Yeni bağımlılık YOK.** Mevcut Retrofit + kotlinx.serialization + Hilt + Compose yeterli.
+
+- **Kararlar/sapmalar:**
+  - İndirim kodu ödeme anında sunucuda uygulanır (`discountCode`); makbuz `paidAmount`/`discountAmount` döner. `explicitNulls=false` sayesinde WALLET'ta `cardId=null` gövdeye yazılmaz (openapi: WALLET'ta cardId verilirse 400).
+  - **İndirim kodu — önizleme YOK (§2.2):** openapi.json'da müşteriye açık indirim-kodu doğrulama/önizleme ucu yoktur (yalnız `POST /rentals/{id}/pay` uygular + admin CRUD). Bu yüzden kod ödemeden ÖNCE tutardan düşülemez; ekranda "kod ödeme sırasında uygulanacak" ipucu gösterilir, geçersiz kod ancak ödeme anında anlaşılır ve hata mesajı **kod-özel** hale getirilir (404/409'da `hasDiscount` bayrağıyla ayrıştırma). Makbuzda indirim + ödenen tutar net gösterilir.
+  - **Kart aksiyonları (16.07.2026):** kart satırında "Varsayılan yap" (`PATCH /cards/{id}/default`) ve **"Sil" metni** (çöp kutusu ikonu yerine; `DELETE /cards/{id}`, önce onay pop-up'ı) var. Silinen kart seçiliyse seçim öntanımlıya/ilk karta düşürülür.
+  - **Tasarım (16.07.2026):** ekran yeniden düzenlendi — yolculuk özeti + Süre/Mesafe tek kartta, ücret dökümü ayrı kart, segmentli (pill) Cüzdan/Kart seçici, seçilebilir kart görünümleri, sabit alt "Ödenecek tutar + Öde" çubuğu + güvenlik ipucu, makbuz stili "Ödendi" ekranı.
+  - Cüzdan bakiyesi < toplam ise "Öde" pasif + uyarı (client tarafı kapı; sunucu da 409 döner).
+  - Açılışta döküm/kart/bakiye **paralel** yüklenir; döküm kritiktir (başarısızsa tam ekran hata), kart/bakiye hatası sessizce boş/0 sayılır.
+  - Navigasyon ekran katmanında (ActiveRentalScreen `LaunchedEffect(isFinished)` → `onNavigateToPayment`); VM'de Effect kanalı eklenmedi (§4.6).
+
+- **Dokunulan/eklenen dosyalar:** yeni `data/remote/dto/PaymentDtos`, `data/remote/api/CardApi`, `data/remote/api/WalletApi`, `data/model/PaymentModels`, `data/mapper/PaymentMapper`, `data/repository/PaymentRepository`, `ui/payment/{PaymentContract,PaymentViewModel,PaymentScreen}`; güncellenen `data/remote/dto/RentalDtos` (RentalResponse döküm alanları), `data/remote/api/RentalApi` (getRental+pay), `di/NetworkModule` (CardApi/WalletApi), `ui/navigation/{RencarDestinations,RencarNavHost}`, `ui/activerental/ActiveRentalScreen`.
+
+- Not (16.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.**

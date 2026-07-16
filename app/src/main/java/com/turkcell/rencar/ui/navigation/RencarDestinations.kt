@@ -79,6 +79,16 @@ object RencarDestinations {
     /** Somut aktif yolculuk rotasını üretir ([Uri.encode] ile güvenli kodlama). */
     fun activeRentalRoute(rentalId: String): String = "$ACTIVE_RENTAL/${Uri.encode(rentalId)}"
 
+    // 10 Ödeme — "Kiralamayı Bitir" (POST /rentals/{id}/finish) sonrası açılır. Ödenecek kiralamanın
+    // id'sini path argümanı taşır: "payment/{rentalId}". Ekran GET /rentals/{id} ile ücret dökümünü,
+    // GET /cards ile kartları, GET /wallet ile bakiyeyi çeker; POST /rentals/{id}/pay ile öder.
+    const val PAYMENT = "payment"
+    const val PAYMENT_ARG_RENTAL_ID = "rentalId"
+    const val PAYMENT_ROUTE = "$PAYMENT/{$PAYMENT_ARG_RENTAL_ID}"
+
+    /** Somut ödeme rotasını üretir ([Uri.encode] ile güvenli kodlama). */
+    fun paymentRoute(rentalId: String): String = "$PAYMENT/${Uri.encode(rentalId)}"
+
     // Home içindeki nested NavHost sekme rotaları (MainScreen). İçerikler şimdilik placeholder.
     const val MAP = "map"
     const val HISTORY = "history"

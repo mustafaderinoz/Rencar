@@ -3,11 +3,13 @@ package com.turkcell.rencar.di
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import com.turkcell.rencar.BuildConfig
 import com.turkcell.rencar.data.remote.api.AuthApi
+import com.turkcell.rencar.data.remote.api.CardApi
 import com.turkcell.rencar.data.remote.api.LicenseApi
 import com.turkcell.rencar.data.remote.api.RefreshApi
 import com.turkcell.rencar.data.remote.api.RentalApi
 import com.turkcell.rencar.data.remote.api.ReservationApi
 import com.turkcell.rencar.data.remote.api.VehicleApi
+import com.turkcell.rencar.data.remote.api.WalletApi
 import com.turkcell.rencar.data.remote.interceptor.AuthInterceptor
 import com.turkcell.rencar.data.remote.interceptor.TokenAuthenticator
 import dagger.Module
@@ -103,4 +105,12 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRentalApi(retrofit: Retrofit): RentalApi = retrofit.create(RentalApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideCardApi(retrofit: Retrofit): CardApi = retrofit.create(CardApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideWalletApi(retrofit: Retrofit): WalletApi = retrofit.create(WalletApi::class.java)
 }

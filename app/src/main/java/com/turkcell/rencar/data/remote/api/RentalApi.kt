@@ -3,6 +3,8 @@ package com.turkcell.rencar.data.remote.api
 import com.turkcell.rencar.data.remote.dto.ActiveRentalResponse
 import com.turkcell.rencar.data.remote.dto.CreateRentalRequest
 import com.turkcell.rencar.data.remote.dto.FinishRentalResponse
+import com.turkcell.rencar.data.remote.dto.PayRentalRequest
+import com.turkcell.rencar.data.remote.dto.PayRentalResponse
 import com.turkcell.rencar.data.remote.dto.RentalPhotosState
 import com.turkcell.rencar.data.remote.dto.RentalResponse
 import okhttp3.MultipartBody
@@ -69,4 +71,22 @@ interface RentalApi {
      */
     @DELETE("rentals/{id}")
     suspend fun cancel(@Path("id") rentalId: String): Response<Unit>
+
+    /**
+     * Tek kiralamanın detayı (RentalController_getMine). Ödeme ekranı bitmiş yolculuğun ücret
+     * dökümünü (totalPrice/startFee/serviceFee/durationMinutes/paymentStatus) buradan çeker.
+     */
+    @GET("rentals/{id}")
+    suspend fun getRental(@Path("id") rentalId: String): RentalResponse
+
+    /**
+     * Tamamlanmış yolculuğu öder (RentalController_pay). method WALLET → cüzdandan düşer (yetersizse
+     * 409); CARD → kayıtlı kartla simüle ödeme (cardId zorunlu). discountCode varsa indirim uygulanır.
+     * Cevap ödeme makbuzudur (tutar dökümü + yöntem detayı).
+     */
+    @POST("rentals/{id}/pay")
+    suspend fun pay(
+        @Path("id") rentalId: String,
+        @Body body: PayRentalRequest,
+    ): PayRentalResponse
 }
