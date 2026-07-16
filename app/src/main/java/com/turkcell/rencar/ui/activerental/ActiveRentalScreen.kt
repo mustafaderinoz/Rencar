@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,10 +44,14 @@ import com.turkcell.rencar.ui.theme.LightPrimary
 import com.turkcell.rencar.ui.theme.RenCarTheme
 import com.turkcell.rencar.ui.theme.rencar
 import java.util.Locale
+import kotlinx.coroutines.delay
 import org.maplibre.android.geometry.LatLng
 
 /** Marka mavisi — tema-bağımsız (bkz. Login/OTP/License/RentalPhotos). */
 private val RencarBlue = LightPrimary
+
+/** Finish başarılı olduktan sonra ödeme ekranına geçmeden önce bekleme (bitiş özeti görünsün). */
+private const val FINISH_TO_PAYMENT_DELAY_MS = 1500L
 
 /** "Kiralamayı Bitir" mercan kırmızısı — tasarımdaki tehlike/aksiyon rengi (tema-bağımsız). */
 private val DangerRed = Color(0xFFF1584F)
@@ -55,9 +60,22 @@ private val DangerRed = Color(0xFFF1584F)
 @Composable
 fun ActiveRentalScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToPayment: (String) -> Unit,
     viewModel: ActiveRentalViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // "Kiralamayı Bitir" başarılı olunca (receipt geldi) ödeme ekranına geç; bu ekran backstack'ten
+    // çıkar (finish tek yönlüdür). Navigasyon ekran katmanında sürülür (VM'de Effect kanalı yok, §4.6).
+    // Kısa bir bekleme, "Yolculuk tamamlandı" özetinin + yönlendirme mesajının kullanıcıya görünmesi
+    // içindir (anında geçince göz atamıyordu).
+    LaunchedEffect(uiState.isFinished) {
+        if (uiState.isFinished) {
+            delay(FINISH_TO_PAYMENT_DELAY_MS)
+            onNavigateToPayment(uiState.rentalId)
+        }
+    }
+
     ActiveRentalScreen(
         uiState = uiState,
         onBack = onNavigateBack,
@@ -359,7 +377,7 @@ private fun FinishedBanner(receipt: RentalReceiptUi?) {
         icon = RencarIcons.Check,
         iconTint = MaterialTheme.rencar.success,
         background = MaterialTheme.rencar.successContainer.copy(alpha = 0.5f),
-        text = "Yolculuk tamamlandı — toplam ${formatCost(total)}. Ödeme adımı yakında.",
+        text = "Yolculuk tamamlandı — toplam ${formatCost(total)}. Ödemeye geçiliyor…",
     )
 }
 
@@ -400,7 +418,7 @@ private fun BottomActions(
     onIntent: (ActiveRentalIntent) -> Unit,
 ) {
     if (uiState.isFinished) {
-        // Yolculuk bitti: ödeme ekranı henüz yok → devre dışı bilgilendirme butonu (ekranda kalınır).
+        // Yolculuk bitti: ödeme ekranına yönlendiriliyor (LaunchedEffect). Geçiş anında kısa görünür.
         Button(
             onClick = {},
             enabled = false,
@@ -415,7 +433,7 @@ private fun BottomActions(
             ),
         ) {
             Text(
-                text = "Ödeme adımı yakında",
+                text = "Ödemeye yönlendiriliyorsunuz…",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )

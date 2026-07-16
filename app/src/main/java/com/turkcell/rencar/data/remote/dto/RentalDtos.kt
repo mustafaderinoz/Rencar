@@ -22,8 +22,12 @@ data class CreateRentalRequest(
 )
 
 /**
- * POST /rentals 201 yanıtı (RentalResponseDto). Foto ekranı yalnızca kiralama kimliğini ve
- * araç özetini (başlık: "Renault Clio · 34 RNC 022") kullanır; kalan alanlar okunmaz.
+ * POST /rentals 201 + GET /rentals/{id} yanıtı (RentalResponseDto). Foto ekranı yalnızca kiralama
+ * kimliğini ve araç özetini kullanır. Ödeme ekranı ise GET /rentals/{id} ile bitmiş kiralamanın
+ * ücret dökümünü çeker: [totalPrice] toplam, [startFee] açılış, [serviceFee] hizmet bedeli
+ * ("Kiralama ücreti" = totalPrice − startFee − serviceFee), [durationMinutes] süre etiketi ("(N dk)"),
+ * [paymentStatus] UNPAID/PAID. Döküm alanları additive + nullable-default'tur (decisions.md
+ * "Minimum Değişiklik") — create/start yanıtı bunları içermese de deserileştirme bozulmaz.
  */
 @Serializable
 data class RentalResponse(
@@ -32,6 +36,12 @@ data class RentalResponse(
     val vehicle: RentalVehicleSummary,
     val plan: String,
     val status: String,
+    val totalPrice: Double? = null,
+    val startFee: Double = 0.0,
+    val serviceFee: Double? = null,
+    val distanceKm: Double = 0.0,
+    val durationMinutes: Double = 0.0,
+    val paymentStatus: String? = null,
 )
 
 /** Kiralama yanıtındaki araç özeti (RentalVehicleSummaryDto). */
