@@ -3,6 +3,7 @@ package com.turkcell.rencar.ui.reservation
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.turkcell.rencar.data.repository.RentalRepository
 import com.turkcell.rencar.data.repository.ReservationRepository
 import com.turkcell.rencar.data.repository.VehicleRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
@@ -22,14 +23,21 @@ import retrofit2.HttpException
  *
  * Araç detayından iletilen vehicleId path argümanını [SavedStateHandle] ile okur; açılışta
  * GET /vehicles/{id} + GET /vehicles/{id}/quote çeker. Plan çipi değişince quote yeniden alınır.
- * "Rezervasyonu Tamamla" POST /reservations çağırır; başarıda [ReservationUiState.reserved]
- * bayrağı verilir (navigasyon ekran katmanında). Ayrı domain/UseCase katmanı yoktur (decisions.md).
+ *
+ * "Rezervasyonu Tamamla" POST /reservations çağırır; sonrası plana göre AYRIŞIR:
+ * - **Dakikalık/Saatlik:** kiralama foto ekranında açılır (POST /rentals orada) →
+ *   [ReservationUiState.reserved] bayrağı verilir.
+ * - **Günlük:** foto adımı YOKTUR (API kaydı anında ACTIVE yapar), bu yüzden kiralama BURADA açılır
+ *   (POST /rentals + endDate) → [ReservationUiState.startedRentalId] verilir.
+ *
+ * Navigasyon ekran katmanındadır. Ayrı domain/UseCase katmanı yoktur (decisions.md).
  */
 @HiltViewModel
 class ReservationViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val vehicleRepository: VehicleRepository,
     private val reservationRepository: ReservationRepository,
+    private val rentalRepository: RentalRepository,
 ) : ViewModel() {
 
     private val vehicleId: String =
@@ -97,16 +105,24 @@ class ReservationViewModel @Inject constructor(
         }
     }
 
-    /** POST /reservations: aracı 15 dk ücretsiz tutar; başarıda geçiş bayrağı verilir. */
+    /**
+     * POST /reservations: aracı 15 dk ücretsiz tutar. Günlük planda kiralama da hemen açılır
+     * (foto adımı yok); diğer planlarda foto ekranına geçiş bayrağı verilir.
+     */
     private fun reserve() {
         val state = _uiState.value
         if (!state.canReserve) return
+        val plan = state.selectedPlan
 
         _uiState.update { it.copy(isReserving = true, errorMessage = null) }
         viewModelScope.launch {
             reservationRepository.reserve(vehicleId)
                 .onSuccess {
-                    _uiState.update { it.copy(isReserving = false, reserved = true) }
+                    if (plan == RentalPlan.DAILY) {
+                        startDailyRental()
+                    } else {
+                        _uiState.update { it.copy(isReserving = false, reserved = true) }
+                    }
                 }
                 .onFailure { e ->
                     _uiState.update { it.copy(isReserving = false, errorMessage = e.toReserveMessage()) }
@@ -114,9 +130,32 @@ class ReservationViewModel @Inject constructor(
         }
     }
 
+    /**
+     * POST /rentals (DAILY): rezervasyon tutulduktan hemen sonra kiralamayı açar. API bu planda
+     * kaydı anında ACTIVE yapar ve fiyatı kilitler; başarıda aktif yolculuk ekranına geçilir.
+     *
+     * Başarısız olursa rezervasyon askıda kalır (araç 15 dk RESERVED); kullanıcı butona tekrar
+     * basarsa POST /reservations 409 döner ve o mesaj gösterilir — bu yüzden hata metni
+     * ayrıştırılır ([toStartRentalMessage]).
+     */
+    private suspend fun startDailyRental() {
+        rentalRepository.createDailyRental(vehicleId)
+            .onSuccess { rental ->
+                _uiState.update { it.copy(isReserving = false, startedRentalId = rental.id) }
+            }
+            .onFailure { e ->
+                _uiState.update { it.copy(isReserving = false, errorMessage = e.toStartRentalMessage()) }
+            }
+    }
+
     /** Ekran, reserved bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
     fun onReservedHandled() {
         _uiState.update { it.copy(reserved = false) }
+    }
+
+    /** Ekran, startedRentalId'yi navigasyonda tüketince çağrılır (tekrar geçişi önler). */
+    fun onRentalStartedHandled() {
+        _uiState.update { it.copy(startedRentalId = null) }
     }
 
     private fun Throwable.toMessage(): String = when (this) {
@@ -137,6 +176,20 @@ class ReservationViewModel @Inject constructor(
             404 -> "Araç bulunamadı."
             409 -> "Bu araç artık müsait değil veya zaten aktif bir rezervasyonunuz var."
             else -> "Rezervasyon oluşturulamadı (${code()}). Lütfen tekrar deneyin."
+        }
+        is IOException -> "İnternet bağlantısı kurulamadı."
+        else -> "Beklenmeyen bir hata oluştu."
+    }
+
+    /** Günlük planda POST /rentals hataları — rezervasyon alınmış, kiralama açılamamıştır. */
+    private fun Throwable.toStartRentalMessage(): String = when (this) {
+        is HttpException -> when (code()) {
+            400 -> "Kiralama başlatılamadı: iade tarihi geçersiz."
+            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
+            403 -> "Kiralama için ehliyet onayınız gerekli."
+            404 -> "Araç bulunamadı."
+            409 -> "Zaten aktif bir kiralamanız var veya araç kiralanabilir değil."
+            else -> "Kiralama başlatılamadı (${code()}). Lütfen tekrar deneyin."
         }
         is IOException -> "İnternet bağlantısı kurulamadı."
         else -> "Beklenmeyen bir hata oluştu."

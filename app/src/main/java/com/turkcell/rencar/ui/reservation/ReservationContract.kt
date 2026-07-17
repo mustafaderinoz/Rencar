@@ -26,10 +26,21 @@ data class ReservationUiState(
     val isQuoteLoading: Boolean = false,
     /** "Kullanım şartları" onay kutusu. */
     val termsAccepted: Boolean = false,
-    /** POST /reservations sürüyor (buton spinner). */
+    /**
+     * POST /reservations (ve günlük planda ardından POST /rentals) sürüyor — buton spinner. Günlük
+     * planda iki çağrı tek bir kullanıcı işlemi olduğundan spinner zincir bitene kadar açık kalır.
+     */
     val isReserving: Boolean = false,
-    /** POST /reservations başarılı → geçiş sinyali (§4.6: Effect yerine state bayrağı). */
+    /**
+     * Dakikalık/Saatlik: POST /reservations başarılı → foto ekranına geçiş sinyali (§4.6: Effect
+     * yerine state bayrağı). Günlük planda KULLANILMAZ — orada geçiş [startedRentalId] ile olur.
+     */
     val reserved: Boolean = false,
+    /**
+     * Günlük: POST /rentals başarılı → açılan kiralamanın id'si (aktif yolculuk ekranına geçiş
+     * sinyali). Günlük planda foto adımı yoktur; API kaydı anında ACTIVE yapar.
+     */
+    val startedRentalId: String? = null,
     /** Yükleme/rezervasyon hata mesajı (yoksa null). */
     val errorMessage: String? = null,
 ) {

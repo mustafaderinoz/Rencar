@@ -4,6 +4,7 @@ import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFact
 import com.turkcell.rencar.BuildConfig
 import com.turkcell.rencar.data.remote.api.AuthApi
 import com.turkcell.rencar.data.remote.api.CardApi
+import com.turkcell.rencar.data.remote.api.IyzicoApi
 import com.turkcell.rencar.data.remote.api.LicenseApi
 import com.turkcell.rencar.data.remote.api.RefreshApi
 import com.turkcell.rencar.data.remote.api.RentalApi
@@ -113,4 +114,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideWalletApi(retrofit: Retrofit): WalletApi = retrofit.create(WalletApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideIyzicoApi(retrofit: Retrofit): IyzicoApi = retrofit.create(IyzicoApi::class.java)
 }

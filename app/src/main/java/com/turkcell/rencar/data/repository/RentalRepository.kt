@@ -11,6 +11,10 @@ import com.turkcell.rencar.data.remote.dto.CreateRentalRequest
 import com.turkcell.rencar.data.remote.socket.RideLocationClient
 import com.turkcell.rencar.data.util.ImageCompressor
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -34,6 +38,26 @@ class RentalRepository @Inject constructor(
      */
     suspend fun createRental(vehicleId: String, plan: String): Result<RentalUi> =
         runCatching { rentalApi.create(CreateRentalRequest(vehicleId, plan)).toUi() }
+
+    /**
+     * Günlük (DAILY) kiralama açar. Bu planda foto adımı YOKTUR: API kaydı anında ACTIVE yapar ve
+     * fiyatı baştan kilitler; çağıran doğrudan Aktif Yolculuk ekranına geçer.
+     *
+     * `endDate` yalnız bu planda zorunludur ve gün hesabı ona göre yapılır. Rezervasyon ekranı
+     * günlük planda "1 gün" tahmini gösterip fiyatı 1440 dk üzerinden hesapladığından iade tarihi
+     * **şu an + [DAILY_RENTAL_DAYS] gün** olarak gönderilir — böylece ekranda görünen tutar ile
+     * faturalanan tutar birebir eşleşir. Bu ayrıntı (tarih biçimi + gün sayısı) burada kapsüllenir;
+     * UI'ın bilmesi gereken bir şey değildir.
+     */
+    suspend fun createDailyRental(vehicleId: String): Result<RentalUi> = runCatching {
+        rentalApi.create(
+            CreateRentalRequest(
+                vehicleId = vehicleId,
+                plan = DAILY_PLAN,
+                endDate = isoUtcFromNow(days = DAILY_RENTAL_DAYS),
+            ),
+        ).toUi()
+    }
 
     /**
      * Bir yönün ([side] = FRONT/BACK/LEFT/RIGHT) fotoğrafını yükler. [file] uygulama iç depodaki
@@ -92,5 +116,27 @@ class RentalRepository @Inject constructor(
         )
         val body = compressed.asRequestBody("image/jpeg".toMediaType())
         return MultipartBody.Part.createFormData(field, compressed.name, body)
+    }
+
+    /**
+     * Şu andan [days] gün sonrasını API'nin beklediği ISO-8601 UTC biçiminde döndürür
+     * ("2026-07-15T10:00:00.000Z"). minSdk 24 + core library desugaring kapalı olduğundan java.time
+     * yerine [SimpleDateFormat]/[Calendar] kullanılır ([com.turkcell.rencar.data.mapper] kalıbı).
+     */
+    private fun isoUtcFromNow(days: Int): String {
+        val utc = TimeZone.getTimeZone("UTC")
+        val calendar = Calendar.getInstance(utc).apply { add(Calendar.DAY_OF_YEAR, days) }
+        val formatter = SimpleDateFormat(ISO_UTC_PATTERN, Locale.US).apply { timeZone = utc }
+        return formatter.format(calendar.time)
+    }
+
+    private companion object {
+        const val DAILY_PLAN = "DAILY"
+
+        /** Günlük planda iade tarihi: rezervasyon ekranındaki "1 gün" tahminiyle birebir. */
+        const val DAILY_RENTAL_DAYS = 1
+
+        /** CreateRentalDto.endDate biçimi (openapi.json örneği: "2026-07-15T10:00:00.000Z"). */
+        const val ISO_UTC_PATTERN = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"
     }
 }

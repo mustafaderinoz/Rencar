@@ -131,6 +131,16 @@ private fun PaymentScreen(
         val card = uiState.cards.firstOrNull { it.id == candidateId }
         DeleteCardDialog(last4 = card?.last4.orEmpty(), onIntent = onIntent)
     }
+
+    // İyzico ödeme sayfası: ayrı sayfa değil, ekranı kaplayan katman (Kart Ekle pop-up'ıyla aynı
+    // kalıp — decisions.md). Oturum açıkken diğer her şeyin üstünü örter.
+    uiState.iyzicoCheckout?.let { checkout ->
+        IyzicoCheckoutOverlay(
+            paymentPageUrl = checkout.paymentPageUrl,
+            onCallbackReached = { onIntent(PaymentIntent.IyzicoCallbackReached) },
+            onClose = { onIntent(PaymentIntent.IyzicoDismissed) },
+        )
+    }
 }
 
 // ── Üst başlık: ‹ geri + "Ödeme" ──
@@ -195,12 +205,16 @@ private fun Content(
             when (uiState.method) {
                 PaymentMethod.WALLET -> WalletSection(uiState)
                 PaymentMethod.CARD -> CardSection(uiState, onIntent)
+                PaymentMethod.IYZICO -> IyzicoSection(uiState)
             }
 
-            Spacer(Modifier.height(22.dp))
-            SectionTitle("İndirim Kodu")
-            Spacer(Modifier.height(12.dp))
-            DiscountField(uiState.discountCode, onIntent)
+            // İndirim kodu İyzico ödemesinde API tarafından reddedilir (400) — alan gizlenir.
+            if (uiState.isDiscountAvailable) {
+                Spacer(Modifier.height(22.dp))
+                SectionTitle("İndirim Kodu")
+                Spacer(Modifier.height(12.dp))
+                DiscountField(uiState.discountCode, onIntent)
+            }
             Spacer(Modifier.height(20.dp))
         }
 
@@ -396,7 +410,7 @@ private fun SectionTitle(text: String) {
     )
 }
 
-// ── Cüzdan / Kart — segmentli seçici (pill) ──
+// ── Cüzdan / Kart / İyzico — segmentli seçici (pill) ──
 @Composable
 private fun MethodSelector(selected: PaymentMethod, onIntent: (PaymentIntent) -> Unit) {
     Row(
@@ -419,6 +433,13 @@ private fun MethodSelector(selected: PaymentMethod, onIntent: (PaymentIntent) ->
             label = "Kart",
             selected = selected == PaymentMethod.CARD,
             onClick = { onIntent(PaymentIntent.SelectMethod(PaymentMethod.CARD)) },
+            modifier = Modifier.weight(1f),
+        )
+        MethodSegment(
+            icon = RencarIcons.Shield,
+            label = "İyzico",
+            selected = selected == PaymentMethod.IYZICO,
+            onClick = { onIntent(PaymentIntent.SelectMethod(PaymentMethod.IYZICO)) },
             modifier = Modifier.weight(1f),
         )
     }
@@ -495,6 +516,56 @@ private fun WalletSection(uiState: PaymentUiState) {
             Spacer(Modifier.height(12.dp))
             NoticeRow(
                 text = "Bakiye yetersiz. Kartla ödeyebilir veya cüzdanınıza bakiye yükleyebilirsiniz.",
+                tint = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+// ── İyzico bölümü: güvenli ödeme açıklaması + tutar sınırı uyarısı ──
+@Composable
+private fun IyzicoSection(uiState: PaymentUiState) {
+    SectionCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(RencarBlue.copy(alpha = 0.10f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = RencarIcons.Shield,
+                    contentDescription = null,
+                    tint = RencarBlue,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "İyzico ile güvenli ödeme",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "Kart bilgileriniz uygulamada tutulmaz.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        NoticeRow(
+            text = "Ödeme, İyzico'nun güvenli ödeme sayfasında yapılır.",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (uiState.iyzicoAmountOutOfRange) {
+            Spacer(Modifier.height(12.dp))
+            NoticeRow(
+                text = "Bu tutar İyzico ile ödenemez. Cüzdan veya kartla ödeyebilirsiniz.",
                 tint = MaterialTheme.colorScheme.error,
             )
         }
@@ -1186,8 +1257,12 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
 /** Ücret: nokta ondalık, "24.50 ₺" (tasarımla birebir; ActiveRental ile tutarlı). */
 private fun formatCost(value: Double): String = "%.2f ₺".format(Locale.US, value)
 
-/** Ödenen yöntem etiketi: Cüzdan ("Cüzdan · kalan 203.50 ₺") veya kart ("VISA · •••• 4291"). */
+/**
+ * Ödenen yöntem etiketi: İyzico, kart ("VISA · •••• 4291") veya cüzdan ("Cüzdan · kalan 203.50 ₺").
+ * İyzico'da kart meta'sı dönmez (PayRentalResponse.card yalnız CARD yönteminde dolar).
+ */
 private fun paidMethodLabel(result: PaymentResultUi): String = when {
+    result.method.equals("IYZICO", ignoreCase = true) -> "İyzico"
     result.method.equals("CARD", ignoreCase = true) -> {
         val brand = if (result.cardBrand.equals("MASTERCARD", ignoreCase = true)) "Mastercard" else "VISA"
         "$brand · •••• ${result.cardLast4.orEmpty()}"
@@ -1244,6 +1319,22 @@ private fun PaymentWalletDarkPreview() {
                 isLoading = false,
                 receipt = PreviewReceipt,
                 method = PaymentMethod.WALLET,
+                walletBalance = 4904.0,
+            ),
+            onBack = {}, onDone = {}, onIntent = {},
+        )
+    }
+}
+
+@Preview(name = "Payment · İyzico · Light", showBackground = true, heightDp = 980)
+@Composable
+private fun PaymentIyzicoLightPreview() {
+    RenCarTheme(darkTheme = false) {
+        PaymentScreen(
+            uiState = PaymentUiState(
+                isLoading = false,
+                receipt = PreviewReceipt,
+                method = PaymentMethod.IYZICO,
                 walletBalance = 4904.0,
             ),
             onBack = {}, onDone = {}, onIntent = {},

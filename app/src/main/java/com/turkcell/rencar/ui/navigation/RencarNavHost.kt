@@ -23,7 +23,6 @@ import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
 import com.turkcell.rencar.ui.payment.PaymentScreen
 import com.turkcell.rencar.ui.rentalphotos.RentalPhotosScreen
-import com.turkcell.rencar.ui.reservation.RentalPlan
 import com.turkcell.rencar.ui.reservation.ReservationScreen
 import com.turkcell.rencar.ui.selfie.SelfieScreen
 
@@ -154,18 +153,21 @@ fun RencarNavHost(
         ) {
             ReservationScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // POST /reservations başarılı → plan'a göre ilerle: Dakikalık/Saatlik'te kiralama
-                // öncesi araç fotoğraf ekranı; DAILY'de foto adımı yok (API anında ACTIVE), Home'a dön.
+                // Dakikalık/Saatlik: rezervasyon sonrası kiralama öncesi araç fotoğraf ekranı
+                // (kiralamayı POST /rentals ile o ekran açar). DAILY buraya düşmez.
                 onReserved = { vehicleId, plan ->
-                    if (plan == RentalPlan.DAILY) {
-                        navController.popBackStack()
-                    } else {
-                        navController.navigate(
-                            RencarDestinations.rentalPhotosRoute(vehicleId, plan.apiPlan),
-                        ) {
-                            // Rezervasyon onayı geri yığından çıkar: foto ekranından geri → Home.
-                            popUpTo(RencarDestinations.RESERVATION_ROUTE) { inclusive = true }
-                        }
+                    navController.navigate(
+                        RencarDestinations.rentalPhotosRoute(vehicleId, plan.apiPlan),
+                    ) {
+                        // Rezervasyon onayı geri yığından çıkar: foto ekranından geri → Home.
+                        popUpTo(RencarDestinations.RESERVATION_ROUTE) { inclusive = true }
+                    }
+                },
+                // Günlük: foto adımı yoktur; kiralama rezervasyon ekranında açılır ve API yolculuğu
+                // anında ACTIVE yapar → doğrudan Aktif Yolculuk (oradan bitir → ödeme).
+                onDailyRentalStarted = { rentalId ->
+                    navController.navigate(RencarDestinations.activeRentalRoute(rentalId)) {
+                        popUpTo(RencarDestinations.RESERVATION_ROUTE) { inclusive = true }
                     }
                 },
             )
