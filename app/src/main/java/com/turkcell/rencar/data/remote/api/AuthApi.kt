@@ -6,6 +6,7 @@ import com.turkcell.rencar.data.remote.dto.OtpRequiredResponse
 import com.turkcell.rencar.data.remote.dto.RegisterRequest
 import com.turkcell.rencar.data.remote.dto.UserDto
 import com.turkcell.rencar.data.remote.dto.VerifyOtpRequest
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -34,4 +35,12 @@ interface AuthApi {
     /** Geçerli token sahibinin profili + rolü. */
     @GET("auth/me")
     suspend fun me(): UserDto
+
+    /**
+     * Çıkış: kullanıcının sunucudaki tüm aktif refresh oturumlarını iptal eder (POST /auth/logout).
+     * Access token AuthInterceptor ile eklenir (uç auth ister); yanıt gövdesi (MessageResponseDto)
+     * kullanılmaz → [Response]<Unit> ile alınır (gövde yok sayılır; CardApi.remove kalıbı).
+     */
+    @POST("auth/logout")
+    suspend fun logout(): Response<Unit>
 }

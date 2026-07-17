@@ -19,6 +19,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -36,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 // androidx.hilt 1.3.0: hiltViewModel() kanonik olarak bu pakette (decisions.md).
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -88,14 +91,23 @@ private fun ProfileScreen(
             uiState.errorMessage != null && uiState.fullName.isEmpty() ->
                 ErrorState(message = uiState.errorMessage, onRetry = { onIntent(ProfileIntent.Retry) })
 
-            else -> ProfileContent(uiState = uiState)
+            else -> ProfileContent(uiState = uiState, onIntent = onIntent)
+        }
+
+        // Çıkış onay pop-up'ı (kart-silme kalıbı): onaylanınca oturum kapatılır ve NavHost login'e döner.
+        if (uiState.showLogoutConfirm) {
+            LogoutConfirmDialog(
+                isLoggingOut = uiState.isLoggingOut,
+                onConfirm = { onIntent(ProfileIntent.ConfirmLogout) },
+                onDismiss = { onIntent(ProfileIntent.DismissLogout) },
+            )
         }
     }
 }
 
 // ── İçerik: başlık + ehliyet kartı + menü + çıkış ──
 @Composable
-private fun ProfileContent(uiState: ProfileUiState) {
+private fun ProfileContent(uiState: ProfileUiState, onIntent: (ProfileIntent) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -126,12 +138,14 @@ private fun ProfileContent(uiState: ProfileUiState) {
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Çıkış yap (statik) ──
+        // ── Çıkış yap: onay pop-up'ını açar (çıkış sürerken tekrar-basma engellenir) ──
         Card {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { }
+                    .clickable(enabled = !uiState.isLoggingOut) {
+                        onIntent(ProfileIntent.LogoutClicked)
+                    }
                     .padding(vertical = 18.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
@@ -367,6 +381,69 @@ private fun ErrorState(message: String, onRetry: () -> Unit) {
         Spacer(Modifier.height(8.dp))
         TextButton(onClick = onRetry) {
             Text(text = "Tekrar dene", color = RencarBlue)
+        }
+    }
+}
+
+// ── Çıkış onay pop-up (Dialog) — kart-silme kalıbı ──
+@Composable
+private fun LogoutConfirmDialog(
+    isLoggingOut: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // Çıkış sürerken dışına dokunmayla kapanmayı engelle (istek uçarken pop-up'ı sabit tut).
+    Dialog(onDismissRequest = { if (!isLoggingOut) onDismiss() }) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surface)
+                .padding(22.dp),
+        ) {
+            Text(
+                text = "Çıkış yap",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "Hesabından çıkış yapmak istediğine emin misin?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(22.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = onDismiss, enabled = !isLoggingOut) {
+                    Text(text = "Vazgeç", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = onConfirm,
+                    enabled = !isLoggingOut,
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = Color.White,
+                    ),
+                ) {
+                    if (isLoggingOut) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    } else {
+                        Text(text = "Çıkış yap", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }
