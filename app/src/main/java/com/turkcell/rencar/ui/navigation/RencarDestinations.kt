@@ -11,7 +11,14 @@ import android.net.Uri
  */
 object RencarDestinations {
 
-    /** 01 Splash / Onboarding — başlangıç ekranı. */
+    /**
+     * 00 Açılış (session restore) — gerçek başlangıç ekranı. Saklı token'la oturumu geri yükleyip
+     * kullanıcıyı doğru ekrana (Home/License/LicensePending) yönlendirir; token yoksa Onboarding'e,
+     * oturum geçersizse Login'e düşer. Yönlendirme sonrası geri yığından temizlenir.
+     */
+    const val SPLASH = "splash"
+
+    /** 01 Onboarding — token'sız kullanıcının karşılama/tanıtım ekranı. */
     const val ONBOARDING = "onboarding"
 
     /** 02 Login — parolasız OTP akışının 1. adımı. */
