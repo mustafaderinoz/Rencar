@@ -24,6 +24,27 @@ object RencarDestinations {
     /** 02 Login — parolasız OTP akışının 1. adımı. */
     const val LOGIN = "login"
 
+    // 02c Kayıt — Login'de girilen numara kayıtlı değilse (POST /auth/login → 401) ya da "Kayıt ol"
+    // linkiyle açılır. Telefon İSTEĞE BAĞLI query argümanıdır: 401 yolunda numara önceden doldurulur,
+    // "Kayıt ol" linkinde boş gelir (defaultValue = ""). Bu yüzden path değil query argümanı.
+    const val REGISTER = "register"
+    const val REGISTER_ARG_PHONE = "phone"
+    const val REGISTER_ROUTE = "$REGISTER?$REGISTER_ARG_PHONE={$REGISTER_ARG_PHONE}"
+
+    /** Somut kayıt rotasını üretir; [phone] 10 haneli numara ya da boş ([Uri.encode] ile kodlanır). */
+    fun registerRoute(phone: String = ""): String =
+        "$REGISTER?$REGISTER_ARG_PHONE=${Uri.encode(phone)}"
+
+    /**
+     * Kayıt ekranının Login'e döndürdüğü sonuç anahtarı — Login'in [androidx.navigation.NavBackStackEntry]
+     * `savedStateHandle`'ına yazılır ("kayıt tamamlandı" bilgisi).
+     *
+     * NOT: Bu handle, Hilt'in ViewModel'e enjekte ettiği `SavedStateHandle` ile AYNI NESNE DEĞİLDİR
+     * (entry kendi iç SavedStateViewModel'ini kullanır). Bu yüzden bayrak VM'de değil, NavHost'ta
+     * okunup ekrana parametre olarak verilir — Navigation'ın sonuç döndürme kalıbı.
+     */
+    const val LOGIN_RESULT_JUST_REGISTERED = "justRegistered"
+
     // 03 OTP doğrulama ekranı, doğrulanacak numarayı path argümanı olarak taşır: "otp/{phone}".
     const val OTP = "otp"
     const val OTP_ARG_PHONE = "phone"

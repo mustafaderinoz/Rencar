@@ -34,7 +34,7 @@ class LoginViewModel @Inject constructor(
 
             LoginIntent.SendCodeClicked -> sendCode()
 
-            // Navigasyon/kayıt ekranları ekran (Screen) katmanında ele alınır.
+            // Navigasyon ekran (Screen) katmanında ele alınır.
             LoginIntent.BackClicked -> Unit
             LoginIntent.RegisterClicked -> Unit
         }
@@ -52,7 +52,14 @@ class LoginViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, codeSent = true) }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
+                    // 401 = "bu numaraya kayıtlı kullanıcı yok". Backend kayıtsız numaraya OTP
+                    // göndermediğinden kayıtsızlık ancak burada anlaşılır: hata göstermek yerine
+                    // kullanıcı kayıt ekranına alınır (numara oraya taşınır).
+                    if (e is HttpException && e.code() == 401) {
+                        _uiState.update { it.copy(isLoading = false, navigateToRegister = true) }
+                    } else {
+                        _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
+                    }
                 }
         }
     }
@@ -62,11 +69,17 @@ class LoginViewModel @Inject constructor(
         _uiState.update { it.copy(codeSent = false) }
     }
 
+    /** Ekran, navigateToRegister bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
+    fun onNavigateToRegisterHandled() {
+        _uiState.update { it.copy(navigateToRegister = false) }
+    }
+
+    /**
+     * Kullanıcıya gösterilecek hata metni. 401 BURAYA DÜŞMEZ — kayıt akışına yönlendirme sinyali
+     * olarak [sendCode] içinde ayrı ele alınır.
+     */
     private fun Throwable.toMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Bu telefon numarasına kayıtlı kullanıcı yok."
-            else -> "Bir hata oluştu (${code()}). Lütfen tekrar deneyin."
-        }
+        is HttpException -> "Bir hata oluştu (${code()}). Lütfen tekrar deneyin."
         is IOException -> "İnternet bağlantısı kurulamadı."
         else -> "Beklenmeyen bir hata oluştu."
     }
