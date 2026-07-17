@@ -52,6 +52,10 @@ data class MapUiState(
      * false → yalnız başlık satırı (kullanıcı tutamaca dokununca aç/kapa yapar).
      */
     val bottomCardExpanded: Boolean = true,
+    /** AI tarafından önerilen araçların ID'leri; haritada vurgulanır. */
+    val recommendedVehicleIds: Set<String> = emptySet(),
+    /** AI öneri diyaloğu gösteriliyor mu. */
+    val showAiDialog: Boolean = false,
 )
 
 /**
@@ -99,4 +103,16 @@ sealed interface MapIntent {
 
     /** Cihaz Geocoder'ı konumu bir mahalle/semt adına çevirdi (null → çözülemedi). */
     data class LocalityResolved(val name: String?) : MapIntent
+
+    /** AI öneri butonuna tıklandı; diyaloğu açar. */
+    data object AiClicked : MapIntent
+
+    /** AI diyaloğu kapatıldı. */
+    data object AiDismissed : MapIntent
+
+    /** AI önerileri temizlendi (filtre kalkar). */
+    data object ClearAiRecommendations : MapIntent
+
+    /** AI önerileri geldi; haritada vurgulanacak ID'leri ayarlar. */
+    data class SetAiRecommendations(val ids: Set<String>) : MapIntent
 }

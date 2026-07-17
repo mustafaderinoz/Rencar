@@ -25,6 +25,7 @@ maplibre = "11.7.1"
 maplibreAnnotation = "3.0.2"
 playServicesLocation = "21.3.0"
 socketIo = "2.1.0"
+generativeai = "0.9.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -64,6 +65,7 @@ maplibre = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "map
 maplibre-annotation = { group = "org.maplibre.gl", name = "android-plugin-annotation-v9", version.ref = "maplibreAnnotation" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 socket-io = { group = "io.socket", name = "socket.io-client", version.ref = "socketIo" }
+generativeai = { group = "com.google.ai.client.generativeai", name = "generativeai", version.ref = "generativeai" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

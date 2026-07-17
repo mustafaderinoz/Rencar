@@ -72,6 +72,23 @@ class MapViewModel @Inject constructor(
 
             is MapIntent.LocalityResolved ->
                 _uiState.update { it.copy(localityName = intent.name) }
+
+            MapIntent.AiClicked ->
+                _uiState.update { it.copy(showAiDialog = true) }
+
+            MapIntent.AiDismissed ->
+                _uiState.update { it.copy(showAiDialog = false) }
+
+            MapIntent.ClearAiRecommendations ->
+                _uiState.update { it.copy(recommendedVehicleIds = emptySet()).withDerived() }
+
+            is MapIntent.SetAiRecommendations ->
+                _uiState.update { 
+                    it.copy(
+                        recommendedVehicleIds = intent.ids,
+                        bottomCardExpanded = true // Sonuçlar gelince kartı aç ki sayı değişimi görülsün
+                    ).withDerived()
+                }
         }
     }
 
@@ -104,7 +121,15 @@ class MapViewModel @Inject constructor(
      * listedeki ilk müsait araçtır (mesafe null).
      */
     private fun MapUiState.withDerived(): MapUiState {
-        val available = vehicles.filter { VehicleMarkers.isAvailable(it.status) }
+        val available = vehicles.filter { v ->
+            val isStatusAvailable = VehicleMarkers.isAvailable(v.status)
+            // Eğer AI önerileri varsa, sadece o listedekileri "müsait" ve "gösterilebilir" say
+            if (recommendedVehicleIds.isNotEmpty()) {
+                isStatusAvailable && v.id in recommendedVehicleIds
+            } else {
+                isStatusAvailable
+            }
+        }
         val loc = myLocation
         val nearest: VehicleUi?
         val distance: Float?

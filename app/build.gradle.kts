@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -29,6 +31,14 @@ android {
         // + /reservations, /wallet döner); eski `rencar.halitkalayci.com` bu alanları döndürmüyordu.
         // Doğrulandı: curl swagger-ui-init.js probe, 13.07.2026.
         buildConfigField("String", "BASE_URL", "\"https://rencarv2.halitkalayci.com/\"")
+
+        val properties = Properties()
+        val propertiesFile = project.rootProject.file("local.properties")
+        if (propertiesFile.exists()) {
+            properties.load(propertiesFile.inputStream())
+        }
+        val geminiKey = properties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
     }
 
     buildTypes {
@@ -84,6 +94,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.face.detection)
+    implementation(libs.generativeai)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
