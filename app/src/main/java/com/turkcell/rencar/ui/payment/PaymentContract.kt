@@ -1,11 +1,20 @@
 package com.turkcell.rencar.ui.payment
 
 import com.turkcell.rencar.data.model.CardUi
+import com.turkcell.rencar.data.model.IyzicoCheckoutUi
 import com.turkcell.rencar.data.model.PaymentReceiptUi
 import com.turkcell.rencar.data.model.PaymentResultUi
 
-/** Ödeme yöntemi sekmesi (Cüzdan / Kart) — tasarımdaki iki seçenekli geçiş. */
-enum class PaymentMethod { WALLET, CARD }
+/**
+ * Ödeme yöntemi sekmesi — tasarımdaki üç seçenekli geçiş.
+ *
+ * [WALLET]/[CARD] sunucuda simüle edilir; [IYZICO] GERÇEK tahsilattır (İyzico ortak ödeme sayfası).
+ */
+enum class PaymentMethod { WALLET, CARD, IYZICO }
+
+/** İyzico'nun kabul ettiği tutar aralığı (TL) — openapi.json: InitializeCheckoutFormDto.price. */
+private const val IYZICO_MIN_AMOUNT = 1.0
+private const val IYZICO_MAX_AMOUNT = 100_000.0
 
 /** Kart Ekle pop-up'ındaki marka seçimi. */
 enum class CardBrand { VISA, MASTERCARD }
@@ -42,10 +51,16 @@ data class PaymentUiState(
     /** "Sil" (DELETE /cards/{id}) sürerken o kartın id'si; yoksa null. */
     val deletingCardId: String? = null,
 
-    /** İndirim kodu alanı (opsiyonel). */
+    /** İndirim kodu alanı (opsiyonel). İyzico yönteminde gizlenir (API kabul etmez). */
     val discountCode: String = "",
 
-    /** POST /rentals/{id}/pay sürüyor (buton spinner). */
+    /**
+     * Açık İyzico ödeme sayfası oturumu (initialize sonrası); dolu olduğu sürece WebView katmanı
+     * ekranı kaplar. Ödeme bitince/iptal edilince null'a döner.
+     */
+    val iyzicoCheckout: IyzicoCheckoutUi? = null,
+
+    /** POST /rentals/{id}/pay sürüyor (buton spinner). İyzico'da initialize/doğrulama da bunu kullanır. */
     val isPaying: Boolean = false,
     /** Ödeme hatası (buton üstünde); yoksa null. */
     val payError: String? = null,
@@ -81,9 +96,21 @@ data class PaymentUiState(
     /** Kart yöntemiyle ödeme mümkün mü (seçili kart var). */
     private val cardReady: Boolean get() = method != PaymentMethod.CARD || selectedCardId != null
 
+    /**
+     * İyzico seçiliyken tutar API'nin kabul ettiği aralığın dışında mı (client tarafı kapı; sunucu
+     * da 400 döner). Uçtaki kiralamalarda (ör. 0 ₺'lik döküm) sayfa hiç açılmasın diye kontrol edilir.
+     */
+    val iyzicoAmountOutOfRange: Boolean
+        get() = method == PaymentMethod.IYZICO &&
+            (payableAmount < IYZICO_MIN_AMOUNT || payableAmount > IYZICO_MAX_AMOUNT)
+
+    /** İndirim kodu alanı gösterilsin mi — İyzico ödemesinde API kodu reddeder (400). */
+    val isDiscountAvailable: Boolean get() = method != PaymentMethod.IYZICO
+
     /** Öde butonu aktif mi. */
     val canPay: Boolean
-        get() = receipt != null && !receipt.alreadyPaid && !isPaying && !walletInsufficient && cardReady
+        get() = receipt != null && !receipt.alreadyPaid && !isPaying &&
+            !walletInsufficient && cardReady && !iyzicoAmountOutOfRange
 
     /** Kart Ekle pop-up'ında "Ekle" aktif mi (son 4 hane + geçerli ay/yıl). */
     val canSubmitCard: Boolean
@@ -119,8 +146,22 @@ sealed interface PaymentIntent {
     /** İndirim kodu alanını günceller. */
     data class DiscountCodeChanged(val code: String) : PaymentIntent
 
-    /** "X ₺ Öde" → POST /rentals/{id}/pay (seçili yöntemle). */
+    /** "X ₺ Öde" → POST /rentals/{id}/pay (seçili yöntemle). İyzico'da önce ödeme sayfasını açar. */
     data object PayClicked : PaymentIntent
+
+    // ── İyzico ödeme sayfası (WebView katmanı) ──
+    /**
+     * WebView, İyzico'nun döndüğü callback adresini gördü → sayfa kapanır ve sonuç token ile
+     * doğrulanır (GET result → POST pay). Ödemenin başarılı olduğu anlamına GELMEZ.
+     */
+    data object IyzicoCallbackReached : PaymentIntent
+
+    /**
+     * Kullanıcı ödeme sayfasını kapattı (✕ / geri). Sayfa kapanır; ödeme fiilen alınmış olabileceği
+     * için sonuç yine sessizce doğrulanır — başarılıysa kiralama ödenmiş sayılır, değilse hata
+     * gösterilmez (kullanıcı zaten vazgeçti).
+     */
+    data object IyzicoDismissed : PaymentIntent
 
     // ── Kart Ekle pop-up ──
     /** "+ Yeni kart ekle" → pop-up'ı açar. */

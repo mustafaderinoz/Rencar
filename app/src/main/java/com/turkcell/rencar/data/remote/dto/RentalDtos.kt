@@ -12,13 +12,18 @@ import kotlinx.serialization.Serializable
  */
 
 /**
- * POST /rentals gövdesi (CreateRentalDto). Dakikalık/Saatlik planda [endDate] gönderilmez
- * (yalnız DAILY'de zorunlu — bu akışta DAILY foto adımını atladığı için hiç kullanılmaz).
+ * POST /rentals gövdesi (CreateRentalDto).
+ *
+ * [endDate] YALNIZ DAILY planda zorunludur (planlanan iade tarihi; gün hesabı buna göre yapılır ve
+ * şu andan ileri olmalıdır). Dakikalık/Saatlik planda GÖNDERİLMEZ — verilirse API 400 döner;
+ * `explicitNulls=false` sayesinde null iken gövdeye hiç yazılmaz (decisions.md → "Minimum Değişiklik",
+ * additive + nullable-default). Biçim: ISO-8601 UTC, ör. "2026-07-15T10:00:00.000Z".
  */
 @Serializable
 data class CreateRentalRequest(
     val vehicleId: String,
     val plan: String,
+    val endDate: String? = null,
 )
 
 /**

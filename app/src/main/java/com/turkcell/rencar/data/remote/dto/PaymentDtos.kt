@@ -76,15 +76,21 @@ data class TopupRequest(
 )
 
 /**
- * POST /rentals/{id}/pay gövdesi (PayRentalDto). [method] WALLET | CARD; CARD'da [cardId] zorunlu,
- * WALLET'ta verilmez. [discountCode] varsa indirim sunucuda uygulanır (opsiyonel). explicitNulls=false
- * olduğundan null alanlar gövdeye yazılmaz (WALLET'ta cardId=null → JSON'a hiç eklenmez).
+ * POST /rentals/{id}/pay gövdesi (PayRentalDto). [method] WALLET | CARD | IYZICO; CARD'da [cardId]
+ * zorunlu, WALLET'ta verilmez. [discountCode] varsa indirim sunucuda uygulanır (opsiyonel) — IYZICO
+ * yönteminde KULLANILAMAZ (birlikte gönderilirse 400). [iyzicoPaymentId] yalnız IYZICO'da zorunlu:
+ * ödeme /iyzico uçlarıyla `rental-<kiralamaId>` basketId'si kullanılarak yapılmış olmalıdır.
+ *
+ * explicitNulls=false olduğundan null alanlar gövdeye yazılmaz (WALLET'ta cardId=null → JSON'a hiç
+ * eklenmez); bu sayede yeni [iyzicoPaymentId] alanı mevcut WALLET/CARD çağrılarını etkilemez
+ * (decisions.md → "Minimum Değişiklik" — additive + nullable-default).
  */
 @Serializable
 data class PayRentalRequest(
     val method: String,
     val cardId: String? = null,
     val discountCode: String? = null,
+    val iyzicoPaymentId: String? = null,
 )
 
 /** Ödemede kullanılan kart özeti (PaidCardSummaryDto) — yalnız CARD yönteminde dolu. */

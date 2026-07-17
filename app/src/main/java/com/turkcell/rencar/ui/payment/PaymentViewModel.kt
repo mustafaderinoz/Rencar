@@ -53,6 +53,8 @@ class PaymentViewModel @Inject constructor(
             PaymentIntent.ConfirmDeleteCard -> _uiState.value.deleteCandidateCardId?.let { deleteCard(it) }
             is PaymentIntent.DiscountCodeChanged -> _uiState.update { it.copy(discountCode = intent.code) }
             PaymentIntent.PayClicked -> pay()
+            PaymentIntent.IyzicoCallbackReached -> finalizeIyzico(silentOnFailure = false)
+            PaymentIntent.IyzicoDismissed -> finalizeIyzico(silentOnFailure = true)
 
             PaymentIntent.AddCardClicked -> _uiState.update { it.copy(showAddCard = true, addCardError = null) }
             PaymentIntent.DismissAddCard -> dismissAddCard()
@@ -103,6 +105,13 @@ class PaymentViewModel @Inject constructor(
         val receipt = state.receipt ?: return
         if (!state.canPay || receipt.alreadyPaid) return
 
+        // İyzico ödemesi kart bilgisini İyzico'nun sayfasında toplar: burada yalnız sayfa açılır,
+        // tahsilat WebView callback'inden sonra doğrulanıp işlenir (finalizeIyzico).
+        if (state.method == PaymentMethod.IYZICO) {
+            startIyzicoCheckout(receipt.totalPrice)
+            return
+        }
+
         _uiState.update { it.copy(isPaying = true, payError = null) }
         val code = state.discountCode.trim().ifBlank { null }
         viewModelScope.launch {
@@ -116,11 +125,71 @@ class PaymentViewModel @Inject constructor(
                     }
                     paymentRepository.payWithCard(rentalId, cardId, code)
                 }
+                // İyzico yukarıda ele alındı; buraya düşmez.
+                PaymentMethod.IYZICO -> return@launch
             }
             result
                 .onSuccess { res -> _uiState.update { it.copy(isPaying = false, result = res) } }
                 .onFailure { e ->
                     _uiState.update { it.copy(isPaying = false, payError = e.toPayMessage(hasDiscount = code != null)) }
+                }
+        }
+    }
+
+    /** İyzico 1/3 — ortak ödeme sayfasını açar; başarıda WebView katmanı görünür olur. */
+    private fun startIyzicoCheckout(amount: Double) {
+        _uiState.update { it.copy(isPaying = true, payError = null) }
+        viewModelScope.launch {
+            paymentRepository.startIyzicoCheckout(rentalId, amount)
+                .onSuccess { checkout ->
+                    _uiState.update { it.copy(isPaying = false, iyzicoCheckout = checkout) }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(isPaying = false, payError = e.toIyzicoMessage()) }
+                }
+        }
+    }
+
+    /**
+     * İyzico 2/3 + 3/3 — sayfa kapandıktan sonra sonucu doğrular ve başarılıysa kiralamaya işler.
+     *
+     * [silentOnFailure] kullanıcı sayfayı kendi kapattığında true olur: ödeme tamamlanmadıysa hata
+     * göstermek yanıltıcı olur (vazgeçmiştir). Yine de doğrulama YAPILIR — callback yakalanamadan
+     * kapatılan başarılı bir ödeme aksi hâlde tahsil edilip kiralamaya işlenmemiş kalırdı.
+     */
+    private fun finalizeIyzico(silentOnFailure: Boolean) {
+        val token = _uiState.value.iyzicoCheckout?.token ?: return
+
+        // Sayfa hemen kapanır; doğrulama alttaki ekranda spinner ile sürer.
+        _uiState.update { it.copy(iyzicoCheckout = null, isPaying = true, payError = null) }
+        viewModelScope.launch {
+            paymentRepository.verifyIyzicoCheckout(token)
+                .onSuccess { verification ->
+                    val paymentId = verification.paymentId
+                    if (!verification.isSuccess || paymentId == null) {
+                        _uiState.update {
+                            it.copy(
+                                isPaying = false,
+                                payError = if (silentOnFailure) null else IYZICO_NOT_COMPLETED,
+                            )
+                        }
+                        return@launch
+                    }
+                    paymentRepository.payWithIyzico(rentalId, paymentId)
+                        .onSuccess { res -> _uiState.update { it.copy(isPaying = false, result = res) } }
+                        .onFailure { e ->
+                            // Tahsilat yapıldı ama kiralamaya işlenemedi: sessize alınmaz, kullanıcı
+                            // parasının çekildiğini ve tekrar denemesi gerektiğini bilmelidir.
+                            _uiState.update { it.copy(isPaying = false, payError = e.toIyzicoPayMessage()) }
+                        }
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            isPaying = false,
+                            payError = if (silentOnFailure) null else e.toIyzicoMessage(),
+                        )
+                    }
                 }
         }
     }
@@ -255,6 +324,33 @@ class PaymentViewModel @Inject constructor(
         else -> "Beklenmeyen bir hata oluştu."
     }
 
+    /** İyzico sayfası açma / sonuç sorgulama hataları (initialize + result uçları). */
+    private fun Throwable.toIyzicoMessage(): String = when (this) {
+        is HttpException -> when (code()) {
+            400 -> "İyzico ödeme isteğini reddetti. Lütfen tekrar deneyin."
+            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
+            403 -> "Bu işlem için yetkiniz yok."
+            503 -> "Ödeme sağlayıcı şu anda kullanılamıyor. Cüzdan veya kartla ödeyebilirsiniz."
+            else -> "İyzico ödemesi başlatılamadı (${code()}). Lütfen tekrar deneyin."
+        }
+        is IOException -> "İnternet bağlantısı kurulamadı."
+        else -> "Beklenmeyen bir hata oluştu."
+    }
+
+    /**
+     * Tahsilat İyzico'da BAŞARILI olduktan sonra POST /rentals/{id}/pay başarısızsa gösterilir.
+     * Para çekilmiş olduğundan mesaj bunu gizlemez.
+     */
+    private fun Throwable.toIyzicoPayMessage(): String = when (this) {
+        is HttpException -> when (code()) {
+            409 -> "Bu yolculuğun ödemesi zaten alınmış görünüyor."
+            else -> "Ödemeniz alındı ancak yolculuğa işlenemedi (${code()}). " +
+                "Lütfen tekrar deneyin; tutar iki kez tahsil edilmez."
+        }
+        is IOException -> "Ödemeniz alındı ancak bağlantı koptuğu için işlenemedi. Lütfen tekrar deneyin."
+        else -> "Ödemeniz alındı ancak yolculuğa işlenemedi. Lütfen tekrar deneyin."
+    }
+
     private fun Throwable.toDeleteCardMessage(): String = when (this) {
         is HttpException -> when (code()) {
             401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
@@ -273,5 +369,11 @@ class PaymentViewModel @Inject constructor(
         }
         is IOException -> "İnternet bağlantısı kurulamadı."
         else -> "Beklenmeyen bir hata oluştu."
+    }
+
+    private companion object {
+        /** Ödeme sayfası kapandı ama İyzico tahsilatı SUCCESS değil (iptal/red/yarım kalan 3DS). */
+        const val IYZICO_NOT_COMPLETED =
+            "Ödeme tamamlanmadı. Kartınızdan tutar çekilmedi; tekrar deneyebilirsiniz."
     }
 }

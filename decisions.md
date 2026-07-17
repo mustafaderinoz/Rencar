@@ -259,6 +259,8 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 
 ### Ödeme Ekranı (Cüzdan/Kart + Kart Ekle) — `POST /rentals/{id}/pay`
 
+> **Güncelleme (17.07.2026):** Ekrana üçüncü bir yöntem eklendi — bkz. "İyzico ile Ödeme (Checkout Form + WebView)".
+
 - Seçim: **Kiralama bitince (`POST /rentals/{id}/finish`) otomatik olarak yeni `payment/{rentalId}` ekranına geçilir; kullanıcı cüzdan veya kayıtlı kartla öder (`POST /rentals/{id}/pay`), opsiyonel indirim kodu girer, başarıda Home'a döner.** Kart kaydetme AYRI SAYFA DEĞİL, ekran içi **pop-up (`androidx.compose.ui.window.Dialog`)**: marka (VISA/Mastercard) + son 4 hane + SKT ay/yıl → `POST /cards`.
 
 - Son Güncelleme Tarihi: 16.07.2026
@@ -310,3 +312,89 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** yeni `data/model/WalletModels`, `data/mapper/WalletMapper`, `data/repository/WalletRepository`, `ui/wallet/{WalletContract,WalletViewModel,WalletScreen}`; güncellenen `data/remote/dto/PaymentDtos` (WalletResponse.transactions + WalletTransaction + TopupRequest), `data/remote/api/WalletApi` (topup), `ui/icons/RencarIcons` (Plus), `ui/home/HomeScreen` (placeholder → WalletScreen).
 
 - Not (16.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.**
+
+---
+
+### `docs/api/openapi.json` — Canlı Sunucudan Tazeleme (17.07.2026)
+
+- Seçim: **`docs/api/openapi.json` canlı Swagger'dan (`/api/docs/swagger-ui-init.js` içindeki gömülü `swaggerDoc`) yeniden üretilir; dosya sunucunun gerisinde kalmışsa entegrasyon öncesi TAZELENİR.**
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Sebep: İyzico işine başlarken dosyada iyzico uçları YOKTU ve `PayRentalDto.method` yalnız `WALLET | CARD` idi; canlı sunucuda ise 8 iyzico ucu + `IYZICO` enum'u mevcuttu. AGENTS §2.2 ("uydurmak yasak") gereği eksik sözleşme uydurulamayacağından dosya canlı gerçekle hizalandı: **41 → 49 path, 43 → 52 şema.** Bu, v1 → v2 geçişindeki durumun tekrarıdır (bkz. "API Base URL" notu) — dosyanın bayat olabileceği varsayılmalı, iş öncesi doğrulanmalıdır.
+
+- **Üretim yöntemi (tekrarlanabilir):** `swagger-ui-init.js` indirilir, gömülü `swaggerDoc` nesnesi ayrıştırılır, `JSON.stringify(spec, null, 2)` ile yazılır; ardından mevcut dosyanın konvansiyonu korunur: `>` → `>` kaçışı, **CRLF** satır sonu, sonda newline YOK. (`/api/docs-json` gibi bir JSON ucu YOKTUR — 404.)
+
+- Not: `"contact": {}` artık tek satır. Eski dosyadaki `{\n\n}` biçimi sunucudan gelmiyordu (ham çıktı da `{}` veriyor); kozmetik sapma giderildi.
+
+---
+
+### İyzico ile Ödeme (Checkout Form + WebView) — `POST /rentals/{id}/pay` (method=IYZICO)
+
+- Seçim: **Ödeme ekranına üçüncü yöntem olarak İyzico eklendi (Cüzdan / Kart / İyzico segmenti). Akış İyzico'nun ORTAK ÖDEME SAYFASI'dır (Checkout Form): `POST /iyzico/checkout-form/initialize` → dönen `paymentPageUrl` uygulama içi WebView'da açılır → `WebViewClient` sunucunun callback adresini görünce katman kodsal olarak kapatılır → `GET /iyzico/checkout-form/result/{token}` ile sonuç doğrulanır → `POST /rentals/{id}/pay` (`method=IYZICO`, `iyzicoPaymentId`) ile kiralama PAID işaretlenir.**
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Alternatifler: **Doğrudan kart ödemesi non-3DS** (`POST /iyzico/payments`) ve **3DS başlatma** (`POST /iyzico/payments/threeds/initialize`, `threeDSHtmlContentDecoded` WebView'a yüklenir) — ikisi de kart numarası/CVV'yi UYGULAMADA toplamayı gerektirir. Checkout Form seçildi: kart verisi hiçbir zaman istemcinin sorumluluğunda olmaz (PCI kapsamı dışı kalır) ve tasarımdaki ekranlar bu sayfayı gösterir.
+
+- Sebep: Cüzdan/Kart yöntemleri sunucuda SİMÜLE edilir; İyzico **gerçek tahsilattır** (sandbox). Kütüphane/dış sistem kullanımı repository ardında tutulur (`PaymentRepository.startIyzicoCheckout/verifyIyzicoCheckout/payWithIyzico`); UI yalnız `IyzicoCheckoutUi`/`IyzicoVerificationUi` modellerini görür.
+
+- **Yeni bağımlılık YOK.** `android.webkit.WebView` framework'ün parçasıdır (`AndroidView` ile sarılır); `androidx.webkit` gerekmedi. `INTERNET` izni zaten mevcut.
+
+- **DTO izolasyonu korunur (bkz. "Katman Derinliği"):** yeni `IyzicoDtos` → `IyzicoModels`, `IyzicoMapper` ile çevrilir; `ui/payment/*` içinde `data.remote.dto` importu yoktur. `PayRentalRequest`'e `iyzicoPaymentId` **additive + nullable-default** eklendi; `explicitNulls=false` sayesinde mevcut WALLET/CARD gövdeleri DEĞİŞMEDİ ("Minimum Değişiklik").
+
+- **Kararlar/sapmalar:**
+  - **`basketId` sözleşmesi:** `POST /rentals/{id}/pay` (IYZICO) doğrulaması sepet kimliğinin **`rental-<kiralamaId>`** olmasını şart koşar. Bu ayrıntı `PaymentRepository`'de kapsüllendi (UI bilmez). Hocanın dersteki "rastgele UID üret" önerisi bu backend'de GEÇERSİZDİR — doğrulama başarısız olur.
+  - **Callback adresi:** gerçek yol `<BASE_URL>/iyzico/checkout-form/callback` (ders notundaki `/easico/checkoutform/callback` yaklaşıktı). Uç **public**tir ve HTML sonuç sayfası döndürür; curl ile doğrulandı.
+  - **Callback yakalama `onPageStarted` ile yapılır, `shouldOverrideUrlLoading` ile DEĞİL:** İyzico callback'e tarayıcıdan **POST** ile döner ve `shouldOverrideUrlLoading` POST navigasyonlarında çağrılmaz. Çift tetiklenme `notified` bayrağıyla engellenir.
+  - **Doğrulama sunucu callback'ini BEKLEMEZ:** `GET /iyzico/checkout-form/result/{token}` durumu doğrudan İyzico'dan okur, bu yüzden WebView'ı `onPageStarted`'da (POST hâlâ uçarken) kapatmak yarış koşulu yaratmaz.
+  - **İndirim kodu İyzico'da YOK:** API `method=IYZICO` + `discountCode` birlikte gelirse 400 döner. Alan İyzico seçiliyken **gizlenir** (`isDiscountAvailable`); `payWithIyzico` kod parametresi almaz. Yöntem değişince girilmiş kod silinmez, yalnız gönderilmez.
+  - **Tutar kapısı:** `InitializeCheckoutFormDto.price` 1–100.000 TL. Aralık dışında "Öde" pasifleşir + uyarı (`iyzicoAmountOutOfRange`); sunucu da 400 döner.
+  - **İptalde de doğrulama yapılır (güvenlik ağı):** kullanıcı sayfayı ✕/geri ile kapatırsa (`IyzicoDismissed`) sonuç **sessizce** sorgulanır — callback yakalanamadan kapatılan başarılı bir ödeme aksi hâlde tahsil edilip kiralamaya işlenmeden kalırdı. Başarısızsa hata GÖSTERİLMEZ (kullanıcı zaten vazgeçti); `IyzicoCallbackReached`'te ise gösterilir.
+  - **Tahsilat sonrası `pay` hatası gizlenmez:** İyzico'da ödeme SUCCESS olup `POST /rentals/{id}/pay` başarısız olursa mesaj paranın çekildiğini açıkça söyler (`toIyzicoPayMessage`).
+  - **`buyer` alanı gönderilmez** (§2.2): sunucu alıcı bilgisini kullanıcı kaydından doldurur; adres/TCKN uydurulmaz.
+  - **WebView ayrı sayfa değil, ekran içi tam ekran katman** — Kart Ekle/Sil pop-up'larıyla aynı kalıp. Uzun `paymentPageUrl`'i route argümanına encode etmek gerekmez; `key(paymentPageUrl)` ile yeni oturumda WebView baştan kurulur, `onRelease`'te `stopLoading` + `destroy` ile sızıntı önlenir. Geri tuşu ✕ ile aynı davranır.
+  - **Kendi çerçevemiz (17.07.2026):** başlık çubuğu (kilit rozeti + "Kart bilgileriniz uygulamada tutulmaz"), sayfa açılırken boş beyaz WebView'ı örten **yükleniyor katmanı**, ana çerçeve hatalarında **"Tekrar dene"** (`onReceivedError` + `isForMainFrame`; alt kaynak hataları yok sayılır), ve ✕/geri için **kapatma onayı** (yanlışlıkla yarım kalan ödemeyi önler).
+  - **Sandbox 3DS sayfası — DEBUG'da stil enjeksiyonu (17.07.2026, KARAR DEĞİŞTİ):** Katmanın içindeki sayfa İyzico'ya (3DS adımında bankaya) aittir. Önce "hiç dokunulmaz" kararı alınmıştı; kullanıcı sandbox simülatörünün ham görünümünü (biçimsiz "Sms Code + yeşil Submit / kırmızı Cancel") demo için kabul edilemez bulduğundan karar **sınırlı enjeksiyon** lehine değiştirildi (`SANDBOX_3DS_RESTYLE_JS`, `onPageFinished`).
+    - **İki bağımsız kapı:** (a) yalnız `BuildConfig.DEBUG` — release'de hiç çalışmaz, dolayısıyla production'daki GERÇEK banka 3DS sayfasına asla dokunulmaz; (b) **kendi kendini hedefler** — script yalnız metni tam "submit" ve "cancel" olan iki eylem öğesi bulursa çalışır, bulamazsa (İyzico'nun kendi ödeme formu, gerçek banka sayfası) no-op'tur.
+    - **CSS sınıf adı VARSAYILMAZ (§2.2):** sayfanın HTML'i elimizde olmadığından (3DS URL'i ödeme başına üretilir, önden çekilemez) butonlar sınıfla değil **görünen metinleriyle** bulunur.
+    - **Form bağı korunarak taşınır:** butonlar yan yana dizilebilmek için tek bir flex satırına alınır. Ayrı `<form>`'larda olabileceklerinden, taşımadan ÖNCE her butona HTML5 **`form` attribute'ü** yazılır (forma id yoksa üretilir) — böylece buton formun dışına çıksa da gönderim bağı kopmaz. Taşıma `try/catch` içindedir: başarısız olursa butonlar yerinde kalır ve taban stille alt alta görünür.
+    - **Kırılganlık kabul edildi:** İyzico bu sayfanın metinlerini/yapısını değiştirirse enjeksiyon sessizce devre dışı kalır — sayfa ÇALIŞMAYA devam eder, yalnız ham görünür (ödeme akışı etkilenmez).
+    - **Doğrulama:** enjekte edilen script Kotlin derleyicisinin denetiminden geçmez (ham string). Node ile ayrıştırılıp sahte DOM üzerinde üç senaryoda sınandı: (a) Submit/Cancel ayrı formlarda → yan yana + her butona kendi form id'si bağlandı, (b) tek formda → yan yana, mevcut id korundu, (c) alakasız sayfa → no-op.
+  - **Katmanın yerel görünüm durumu** (yükleniyor/hata/çıkış onayı) ViewModel'e taşınmadı: intent'lerle sürülen uygulama state'i değil, WebView'ın kendi sayfa-yükleme durumudur (§4.2 "saf UI durumu" ile uyumlu; VM'e taşımak her sayfa olayı için intent gerektirirdi).
+  - **Kart bilgisi uygulamada toplanmaz:** JS + DOM storage yalnız İyzico/banka sayfası için açıktır.
+  - Navigasyon değişmedi (`RencarDestinations`/`RencarNavHost` aynı); §4.6 gereği Effect kanalı eklenmedi.
+
+- **Sandbox test bilgileri:** kart `5528790000000008` · 12/2030 · CVC 123 — 3D Secure SMS kodu **283126**.
+
+- **API anahtarı (backend işi):** ödemeler backend'deki firma anahtarına düşer. Kendi İyzico Sandbox panelinizde görmek için backend'in firma ayarı sizin API anahtarınızla güncellenmelidir — mobil taraftan yapılamaz. `GET /iyzico/health` anahtarların ayarlı olduğunu doğrular (auth ister); anahtar yoksa tüm iyzico uçları **503** döner ve ekran "Ödeme sağlayıcı şu anda kullanılamıyor" gösterir.
+
+- **Dokunulan/eklenen dosyalar:** yeni `data/remote/dto/IyzicoDtos`, `data/remote/api/IyzicoApi`, `data/model/IyzicoModels`, `data/mapper/IyzicoMapper`, `ui/payment/IyzicoCheckoutWebView`; güncellenen `data/remote/dto/PaymentDtos` (PayRentalRequest.iyzicoPaymentId), `data/repository/PaymentRepository`, `di/NetworkModule` (IyzicoApi), `ui/payment/{PaymentContract,PaymentViewModel,PaymentScreen}`, `ui/icons/RencarIcons` (Close), `docs/api/openapi.json`.
+
+- Not (17.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Uçtan uca sandbox ödemesi cihazda DENENMEDİ (giriş yapmış CUSTOMER oturumu gerekir).
+
+---
+
+### Günlük (DAILY) Kiralama Akışı — `POST /rentals` + `endDate`
+
+- Seçim: **Günlük planda kiralama REZERVASYON EKRANINDA açılır (`POST /rentals`, `plan=DAILY`, `endDate` = şu an + 1 gün) ve doğrudan Aktif Yolculuk ekranına geçilir; oradan "Kiralamayı Bitir" → Ödeme.** Foto adımı YOKTUR (API bu planda kaydı anında ACTIVE yapar).
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Sebep: **Günlük plan hiç uygulanmamıştı.** `RencarNavHost`'ta DAILY dalı `popBackStack()` ile Home'a dönüyordu ve `POST /rentals` yalnız `RentalPhotosViewModel`'den (yani yalnız PER_MINUTE/HOURLY'de) çağrılıyordu. Sonuç: kullanıcı günlük rezerve edince araç 15 dk tutuluyor, kiralama hiç açılmıyor, rezervasyon sessizce düşüyordu; ödeme ekranına da ulaşılamıyordu. Hata mesajı çıkmadığından bozukluk görünmüyordu. `CreateRentalRequest`'te `endDate` alanı da yoktu (yorumu bunu kapsam dışı ilan ediyordu) — yani mevcut `createRental` günlük için çağrılsa API 400 dönerdi.
+
+- **Gün sayısı — sabit 1 gün (kullanıcı kararı):** Alternatif "1–30 gün seçici" idi. Rezervasyon ekranı zaten `RentalPlan.DAILY.estimateLabel = "1 gün"` gösteriyor ve fiyat önizlemesini 1440 dk üzerinden alıyor; `endDate`'i buna eşitlemek **ekranda görünen tutar ile faturalanan tutarın birebir eşleşmesini** sağlar ve yeni UI gerektirmez. Gün seçici ileride eklenirse yalnız `RentalRepository.DAILY_RENTAL_DAYS` + quote `minutes` parametresi değişir.
+
+- **DTO ("Minimum Değişiklik"):** `CreateRentalRequest`'e `endDate: String? = null` **additive + nullable-default** eklendi. `explicitNulls=false` sayesinde Dakikalık/Saatlik gövdelerine yazılmaz (API bu planlarda `endDate` verilirse 400 döner) — mevcut foto akışı DEĞİŞMEDİ.
+
+- **Tarih üretimi repository'de kapsüllendi:** `RentalRepository.createDailyRental(vehicleId)` hem gün sayısını hem ISO biçimini bilir; UI'a sızmaz (iyzico `basketId` kalıbının aynısı). minSdk 24 + desugaring kapalı olduğundan java.time yerine `SimpleDateFormat`/`Calendar` + `Locale.US` + UTC kullanıldı (mapper katmanı kalıbı). Biçim `yyyy-MM-dd'T'HH:mm:ss.SSS'Z'` (openapi örneği: `2026-07-15T10:00:00.000Z`). JBR ile çalıştırılan bir denemede doğrulandı: biçim eşleşmesi, tarihin gelecekte olması (+24 sa), cihaz `Europe/Istanbul` iken bile UTC yazması ve `ar-EG` yerel ayarında ASCII rakam üretmesi (`Locale.US` sayesinde).
+
+- **Kararlar/sapmalar:**
+  - Rezervasyon + kiralama **tek kullanıcı işlemi** sayılır: buton spinner'ı (`isReserving`) zincir bitene kadar açık kalır.
+  - `POST /rentals` başarısız olursa rezervasyon askıda kalır (araç 15 dk RESERVED). Hata metni ayrı eşlenir (`toStartRentalMessage`); kullanıcı tekrar denerse `POST /reservations` 409 döner ve o mesaj görünür. **Otomatik rezervasyon iptali EKLENMEDİ** — istenirse `DELETE /reservations/{id}` ile ayrı bir iş.
+  - Navigasyon §4.6'ya uygun: Effect kanalı yok, state bayrağı (`startedRentalId`) + ekran katmanında `LaunchedEffect`.
+  - `POST /rentals/{id}/return` (eski uç, yalnız DAILY) KULLANILMAZ: `finish` günlük planda da çalışır ve baştan kilitlenen fiyatı değiştirmez — böylece bitirme + ödeme akışı tüm planlarda TEKTİR (iyzico dahil).
+
+- **Dokunulan dosyalar:** `data/remote/dto/RentalDtos` (CreateRentalRequest.endDate), `data/repository/RentalRepository` (createDailyRental + isoUtcFromNow), `ui/reservation/{ReservationContract,ReservationViewModel,ReservationScreen}`, `ui/navigation/RencarNavHost`.
+
+- Not (17.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Uçtan uca cihazda DENENMEDİ.
