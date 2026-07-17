@@ -26,6 +26,8 @@ import com.turkcell.rencar.ui.rentalphotos.RentalPhotosScreen
 import com.turkcell.rencar.ui.reservation.RentalPlan
 import com.turkcell.rencar.ui.reservation.ReservationScreen
 import com.turkcell.rencar.ui.selfie.SelfieScreen
+import com.turkcell.rencar.ui.splash.SplashDestination
+import com.turkcell.rencar.ui.splash.SplashScreen
 
 /**
  * Uygulamanın navigasyon grafiği (decisions.md: Compose Navigation).
@@ -44,7 +46,9 @@ fun RencarNavHost(
     LaunchedEffect(Unit) {
         mainViewModel.forcedLogout.collect {
             navController.navigate(RencarDestinations.LOGIN) {
-                popUpTo(RencarDestinations.ONBOARDING) { inclusive = true }
+                // Başlangıç artık SPLASH; oto-login'le doğrudan Home'a girilince geri yığında
+                // ONBOARDING/SPLASH bulunmayabilir. Tüm grafiği temizleyip yalnız Login bırak.
+                popUpTo(navController.graph.id) { inclusive = true }
                 launchSingleTop = true
             }
         }
@@ -52,7 +56,7 @@ fun RencarNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = RencarDestinations.ONBOARDING,
+        startDestination = RencarDestinations.SPLASH,
 
         // Geçiş (fade) sırasında ekranlar yarı saydamken aralarından kök/pencere arka planı
         // görünüp parlak bir "patlama"ya yol açıyordu; surface zemini bu sızıntıyı kapatır.
@@ -60,6 +64,25 @@ fun RencarNavHost(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
     ) {
+        // Açılış (session restore): saklı token'la oturumu geri yükleyip çözülen ilk hedefe geçer;
+        // splash geri yığından temizlenir (kullanıcı geri tuşuyla splash'e dönemez).
+        composable(RencarDestinations.SPLASH) {
+            SplashScreen(
+                onDestinationResolved = { destination ->
+                    val route = when (destination) {
+                        SplashDestination.ONBOARDING -> RencarDestinations.ONBOARDING
+                        SplashDestination.LOGIN -> RencarDestinations.LOGIN
+                        SplashDestination.HOME -> RencarDestinations.HOME
+                        SplashDestination.LICENSE_UPLOAD -> RencarDestinations.LICENSE
+                        SplashDestination.LICENSE_PENDING -> RencarDestinations.LICENSE_PENDING
+                    }
+                    navController.navigate(route) {
+                        popUpTo(RencarDestinations.SPLASH) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+            )
+        }
         // Onboarding: "Hemen Başla" ve "Giriş yap" mevcut tek giriş ekranına (Login) yönlendirir.
         composable(RencarDestinations.ONBOARDING) {
             OnboardingScreen(

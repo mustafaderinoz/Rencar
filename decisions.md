@@ -109,6 +109,25 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - Not (15.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** `RideLocationClient`'in socket `connect_error → refresh → reconnect` dalı da geri bağlandı (aşağıdaki "Aktif Yolculuk" sapma notuna bakınız).
 
 
+### Açılışta Oturum Geri Yükleme (Session Restore / Splash)
+
+- Seçim: **Yeni `SPLASH` başlangıç ekranı** (MVI §4 kalıbı: `ui/splash/{SplashContract,SplashViewModel,SplashScreen}`). Uygulama açılışında saklı access token varsa `GET /auth/me` çağrılır; **süresi dolmuş access token, `TokenAuthenticator` üzerinden refresh token'la sessizce yenilenir** (yukarıdaki "Oturum Yönetimi & Token Yenileme" altyapısını doğrudan kullanır). Sonuca göre yönlendirilir: token yok → Onboarding; `me()` başarılı → rol/ehliyet durumuna göre Home/License/LicensePending; **401** (refresh de öldü, oturum temizlendi) → Login; ağ hatası → "Tekrar Dene". `startDestination` `ONBOARDING`'den `SPLASH`'e çevrildi.
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Alternatifler: **`startDestination`'ı token'a göre dinamik seçme** (auth kontrolü ilk kompozisyondan önce bitmeli → yükleme kapısı yine gerekir), **her ekranda ayrı auth-guard** (kod tekrarı). Ayrı bir splash hedefi + "çöz → popUpTo(SPLASH, inclusive) ile geç" kalıbı seçildi; bu, OTP sonrası "çöz → popUpTo(ONBOARDING) ile geç" kalıbıyla tutarlı.
+
+- Sebep: Önceden `startDestination = ONBOARDING` sabitti; girişli kullanıcı bile her açılışta Onboarding→Login→OTP'ye zorlanıyor, saklı refresh token açılışta **hiç kullanılmıyordu**. Splash, mevcut `SessionManager`/`Authenticator` motorunu bir `me()` çağrısıyla tetikleyerek oturumu geri yükler (yeni bağımlılık/uç YOK — §2.2).
+
+- **Yönlendirme kuralı tekrarı (bilinçli):** `SplashViewModel.resolveDestination`, `OtpVerificationViewModel.resolveDestination` ile AYNI kuralı taşır (PENDING + `GET /license/status` → LICENSE_PENDING/HOME/LICENSE_UPLOAD). Ortak bir UseCase katmanı EKLENMEDİ (§4.6 / "Katman Derinliği" — +1 tier yok); kodun çalışan OTP akışına dokunmamak için ("Minimum Değişiklik") kural iki VM'de replike edildi; ikisi birlikte güncel tutulmalıdır (kod içinde çapraz-referans notu var).
+
+- **`forcedLogout` navigasyonu güncellendi:** başlangıç artık SPLASH olduğundan ve oto-login'le doğrudan Home'a girildiğinde geri yığında ONBOARDING bulunmadığından, sert-logout `popUpTo(RencarDestinations.ONBOARDING)` yerine `popUpTo(navController.graph.id) { inclusive = true }` ile tüm grafiği temizler. Diğer `popUpTo(ONBOARDING)` kullanımları yalnız token'sız akışta (Onboarding yığında) çalıştığından değişmedi.
+
+- **Dokunulan/eklenen dosyalar:** yeni `ui/splash/{SplashContract,SplashViewModel,SplashScreen}`; güncellenen `ui/navigation/RencarDestinations` (SPLASH), `ui/navigation/RencarNavHost` (startDestination + splash composable + forcedLogout popUpTo).
+
+- Not (17.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.**
+
+
 ### Katman Derinliği (Data)
 
 - Seçim: **data + repository + ayrı mapper katmanı** (ViewModel → Repository → ApiService; **DTO → model dönüşümü repository'nin DIŞINDA, kendi mapper katmanında** yapılır).
