@@ -154,6 +154,36 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Not (14.07.2026): Karar alındı ve KOD HİZALANDI.** Ayrı mapper/model katmanı eklendi (`data/model/*Ui` + `data/mapper/*Mapper`). Tüm akışlar repository üzerinden model döndürür: Vehicle (`VehicleUi`), Reservation/Quote (`QuoteUi`), Auth/Profil/License (`UserUi` + `LicenseVerificationStatus`), Rental (`RentalUi` + `RentalPhotosUi`). Kullanılmayan yanıtlar `Result<Unit>`'e indirgendi (login/reserve/upload/startRental). `ui/` katmanında hiçbir `data.remote.dto` import'u kalmadı (grep ile doğrulandı); `:app:compileDebugKotlin` başarılı.
 
 
+### Araç Listeleme — Sayfalama (GET /vehicles)
+
+- Seçim: **`VehicleRepository.getAvailableVehicles` TÜM sayfaları dolaşır** (`limit=100` — API maks., `page` 1'den artarak; eksik dolu sayfa gelince durur) ve birleştirir. Önceden tek çağrı yapılıyor, `page`/`limit` gönderilmiyordu.
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Sebep (BUG düzeltmesi): `GET /vehicles` **sayfalıdır**; `limit` gönderilmezse sunucu yalnızca varsayılan ilk sayfayı (**20 araç**, en son eklenenler) döner. Seed verisinde en yeni araçlar Ankara/Eskişehir olduğundan, İstanbul'daki ~118 araç sonraki sayfalarda kalıyor ve haritada **hiç görünmüyordu** ("araçlar listelenmiyor" şikâyeti). Doğrulandı: `limit=100` → 100 araç (69 İstanbul), `page=2` → 49 araç (hepsi İstanbul). API'de konum/şehir filtresi YOK (§2.2), bu yüzden istemci tüm araçları çekip haritada görünürdekileri eler.
+
+- Alternatifler: **Tek sayfa `limit=100`** (max 100 < toplam ~149 → yine eksik kalır), **bbox/konum filtresi** (API'de yok — §2.2 uydurma yasak).
+
+- Not: Değişiklik tek dosyada (`data/repository/VehicleRepository`), mimariye uygun (data katmanı; ViewModel/UI/mapper etkilenmez). `MAX_PAGES=20` güvenlik sınırı sonsuz döngüyü engeller. **Gerçek cihazda doğrulandı** — İstanbul konumunda harita 146 araçla doldu (öncesinde 20). `:app:assembleDebug` başarılı.
+
+
+### Harita — Araç Kümeleme (Clustering)
+
+- Seçim: **MapLibre yerel kümelemesi** (`GeoJsonOptions.withCluster/withClusterRadius/withClusterMaxZoom`). `vehicles` kaynağı kümelenir; tekil araç `SymbolLayer`'ına `!has("point_count")`, kümeler için ayrı `clusters-layer`'a `has("point_count")` filtresi konur. `clusterRadius` PİKSEL olduğundan zoom arttıkça kapsanan coğrafi alan küçülür → kümeler **zooma bağlı** ayrışır; `clusterMaxZoom` üstünde araçlar tek tek görünür. Kümeye dokununca yakınlaşılır (küme açılır).
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Alternatifler: **İstemci tarafı ızgara kümeleme** (kamera her hareketinde elle yeniden hesap — motorun yaptığını tekrarlar), **plugin-annotation `SymbolManager` + ClusterOptions** (ikinci bir işaretçi sistemi; mevcut GeoJSON/SymbolLayer akışına ekstra katman).
+
+- Sebep: 146 araç düşük zoom'da üst üste binip haritayı okunmaz yapıyordu. Yerel kümeleme zoom'a tepkiyi motor tarafında (yeniden kümeleme) otomatik verir; yalnızca render'ı biz yaparız.
+
+- **Glyph kısıtı (mevcut karar korunur):** OSM raster stili font/glyphs içermez → küme sayısı native `text-field` ile YAZILAMAZ. Fiyat balonlarındaki gibi sayı Canvas ile bitmap'e çizilir: `iconImage` ifadesi `"cluster-<sayı>"` ikon adını üretir, bitmap **talep anında** `MapView.addOnStyleImageMissingListener` ile üretilip stile eklenir ve önbelleklenir (zoom/pan ile sayı değiştikçe yeni ikon istenir). Glyph/font sunucusu (harici bağımlılık) EKLENMEDİ.
+
+- **Dokunulan dosyalar:** `ui/map/RencarMap` (kümeli kaynak + filtreli tekil katman + clusters-layer + OnStyleImageMissing + kümeye-dokun-yakınlaş), `ui/map/VehicleMarkers` (`buildCluster` sayı balonu bitmap'i). **Yeni bağımlılık YOK.**
+
+- Not (17.07.2026): **Gerçek cihazda doğrulandı** — z10'da büyük kümeler (17/13/9…), yakınlaştıkça küçük kümelere (7/5/2) ve tekil fiyat balonlarına ayrışıyor. `:app:assembleDebug` başarılı.
+
+
 ### API Base URL
 
 - Seçim: **`https://rencarv2.halitkalayci.com/`** (`BuildConfig.BASE_URL`)

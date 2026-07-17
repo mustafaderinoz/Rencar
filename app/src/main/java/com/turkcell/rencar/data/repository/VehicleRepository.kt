@@ -3,6 +3,7 @@ package com.turkcell.rencar.data.repository
 import com.turkcell.rencar.data.mapper.toUi
 import com.turkcell.rencar.data.model.VehicleUi
 import com.turkcell.rencar.data.remote.api.VehicleApi
+import com.turkcell.rencar.data.remote.dto.VehicleResponse
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,11 +32,25 @@ class VehicleRepository @Inject constructor(
         includeBusy: Boolean = false,
     ): Result<List<VehicleUi>> =
         runCatching {
-            vehicleApi.list(
-                type = type,
-                segment = segment,
-                includeBusy = if (includeBusy) "true" else null,
-            ).toUi()
+            // GET /vehicles SAYFALIDIR: page/limit gönderilmezse sunucu yalnızca varsayılan ilk
+            // sayfayı (20 araç, en son eklenenler) döner → başka şehirlerdeki araçlar hiç gelmez.
+            // API'de konum/şehir filtresi olmadığından (§2.2), tüm sayfalar limit=100 (API maks.)
+            // ile dolaşılıp birleştirilir; harita zaten görünürdeki araçları eler.
+            val all = mutableListOf<VehicleResponse>()
+            var page = 1
+            while (page <= MAX_PAGES) {
+                val batch = vehicleApi.list(
+                    type = type,
+                    segment = segment,
+                    includeBusy = if (includeBusy) "true" else null,
+                    page = page,
+                    limit = PAGE_SIZE,
+                )
+                all += batch
+                if (batch.size < PAGE_SIZE) break // eksik dolu sayfa = son sayfa
+                page++
+            }
+            all.toUi()
         }
 
     /**
@@ -44,4 +59,12 @@ class VehicleRepository @Inject constructor(
      */
     suspend fun getVehicle(id: String): Result<VehicleUi> =
         runCatching { vehicleApi.getOne(id).toUi() }
+
+    private companion object {
+        /** Sayfa başına araç (openapi: limit maks. 100). */
+        const val PAGE_SIZE = 100
+
+        /** Güvenlik sınırı: olası hatalı sunucu davranışında sonsuz döngüyü engeller (100×20 = 2000 araç). */
+        const val MAX_PAGES = 20
+    }
 }

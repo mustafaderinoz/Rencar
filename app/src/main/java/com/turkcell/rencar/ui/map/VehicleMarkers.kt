@@ -188,6 +188,61 @@ object VehicleMarkers {
         return bitmap
     }
 
+    /**
+     * Küme (cluster) "sayı balonu": marka mavisi dolgu + beyaz halka + ortada beyaz kalın sayı,
+     * arkasında yumuşak glow. [label] küme büyüklüğüdür (ör. "12"); balon çapı metne göre büyür.
+     * Stilde glyph/font olmadığından sayı Canvas ile bitmap'e çizilir (fiyat balonlarıyla aynı yaklaşım).
+     */
+    fun buildCluster(context: Context, label: String): Bitmap {
+        val d = context.resources.displayMetrics.density
+        fun dp(v: Float) = v * d
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = dp(15f)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+
+        val ringWidth = dp(3f)
+        val glowRadius = dp(9f)
+        val margin = glowRadius + dp(4f)
+        // Çap metinle büyür (çok haneli kümeler taşmasın); alt sınır sabit.
+        val diameter = maxOf(dp(40f), textPaint.measureText(label) + dp(26f))
+        val size = ceil(diameter + margin * 2).toInt()
+
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val cx = size / 2f
+        val cy = size / 2f
+        val radius = diameter / 2f
+
+        // Glow — marka mavisi bulanık halo.
+        val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = BRAND_BLUE
+            alpha = 150
+            maskFilter = BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL)
+        }
+        canvas.drawCircle(cx, cy, radius, glowPaint)
+
+        // Beyaz halka + hafif gölge.
+        val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            setShadowLayer(dp(3f), 0f, dp(1f), 0x40000000)
+        }
+        canvas.drawCircle(cx, cy, radius, ringPaint)
+
+        // Mavi dolgu.
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = BRAND_BLUE }
+        canvas.drawCircle(cx, cy, radius - ringWidth, fillPaint)
+
+        // Sayı — dikeyde ortalanmış.
+        val fm = textPaint.fontMetrics
+        canvas.drawText(label, cx, cy - (fm.ascent + fm.descent) / 2f, textPaint)
+
+        return bitmap
+    }
+
     /** [size] boyutlu kutuya basit bir beyaz araç silueti (kabin + gövde + tekerler) çizer. */
     private fun drawCar(canvas: Canvas, x: Float, y: Float, size: Float, paint: Paint) {
         val cabin = Path().apply {

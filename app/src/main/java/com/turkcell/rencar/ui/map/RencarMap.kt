@@ -31,10 +31,12 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonOptions
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
@@ -50,6 +52,23 @@ private const val DEFAULT_ZOOM: Double = 10.0
 private const val RIDE_ZOOM: Double = 15.0
 
 private val ME_MARKER_COLOR = Color.parseColor("#4285F4")
+
+// ── Kümeleme (clustering) ─────────────────────────────────────────────────────────────────────
+/** Kümeleme yarıçapı (PİKSEL). Sabit piksel olduğundan zoom arttıkça kapsanan coğrafi alan küçülür
+ *  → kümeler zooma bağlı olarak ayrışır. Büyük değer = daha geniş kümeleme alanı. */
+private const val CLUSTER_RADIUS: Int = 60
+
+/** Bu zoom seviyesinin üstünde kümeleme yapılmaz; araçlar tek tek gösterilir. */
+private const val CLUSTER_MAX_ZOOM: Int = 14
+
+/** Kümeye dokununca kaç kademe yakınlaşılacağı (küme açılır). */
+private const val CLUSTER_ZOOM_STEP: Double = 2.0
+
+/** Kümeye dokunarak yakınlaşmada üst zoom sınırı. */
+private const val MAX_CLUSTER_ZOOM: Double = 18.0
+
+/** Küme sayı balonu ikon adı öneki: "cluster-<sayı>" (talep anında bitmap üretilir). */
+private const val CLUSTER_IMAGE_PREFIX: String = "cluster-"
 
 /** OSM raster kaynağı kullanan minimal MapLibre stili (harici sunucu gerektirmez). */
 private const val OSM_STYLE_JSON: String = """
@@ -199,16 +218,54 @@ fun RencarMap(
                     ),
                 )
 
-                // Araç fiyat balonları -> her feature'ın "icon" özelliği ilgili bitmap'i seçer.
-                loaded.addSource(GeoJsonSource("vehicles"))
+                // Araç fiyat balonları. Kaynak KÜMELENİR: yakın araçlar düşük zoom'da tek bir "sayı
+                // balonu"nda toplanır; zoom arttıkça (clusterRadius piksel sabit) kapsanan coğrafi alan
+                // küçülür ve kümeler ayrışır. clusterMaxZoom üstünde her araç tek tek gösterilir.
+                loaded.addSource(
+                    GeoJsonSource(
+                        "vehicles",
+                        GeoJsonOptions()
+                            .withCluster(true)
+                            .withClusterRadius(CLUSTER_RADIUS)
+                            .withClusterMaxZoom(CLUSTER_MAX_ZOOM),
+                    ),
+                )
+                // Tekil araçlar (kümelenmemiş): "icon" özelliği ilgili fiyat balonu bitmap'ini seçer.
                 loaded.addLayer(
                     SymbolLayer("vehicles-layer", "vehicles").withProperties(
                         PropertyFactory.iconImage("{icon}"),
                         PropertyFactory.iconAllowOverlap(true),
                         PropertyFactory.iconIgnorePlacement(true),
                         PropertyFactory.iconAnchor(Property.ICON_ANCHOR_BOTTOM),
-                    ),
+                    ).withFilter(Expression.not(Expression.has("point_count"))),
                 )
+                // Kümeler: "cluster-<sayı>" ikon adıyla; bitmap talep anında üretilir (aşağıdaki
+                // OnStyleImageMissing). Stil glyph/font içermediğinden sayı native text yerine Canvas
+                // ile bitmap'e çizilir (fiyat balonlarıyla aynı yaklaşım).
+                loaded.addLayer(
+                    SymbolLayer("clusters-layer", "vehicles").withProperties(
+                        PropertyFactory.iconImage(
+                            Expression.concat(
+                                Expression.literal(CLUSTER_IMAGE_PREFIX),
+                                Expression.toString(Expression.get("point_count")),
+                            ),
+                        ),
+                        PropertyFactory.iconAllowOverlap(true),
+                        PropertyFactory.iconIgnorePlacement(true),
+                        PropertyFactory.iconAnchor(Property.ICON_ANCHOR_CENTER),
+                    ).withFilter(Expression.has("point_count")),
+                )
+                // Küme sayı balonu bitmap'lerini talep anında üret: motor "cluster-<sayı>" ikonunu
+                // isteyince (zoom/pan ile sayı değiştikçe) burada üretilip stile eklenir ve önbelleklenir.
+                // (OnStyleImageMissing MapLibre'de MapView üzerindedir, MapLibreMap'te değil.)
+                mapView.addOnStyleImageMissingListener { id ->
+                    if (id.startsWith(CLUSTER_IMAGE_PREFIX)) {
+                        loaded.addImage(
+                            id,
+                            VehicleMarkers.buildCluster(context, id.removePrefix(CLUSTER_IMAGE_PREFIX)),
+                        )
+                    }
+                }
 
                 // Aktif yolculuk araç pin'i (ridePoint) — merkez-çapalı tekil işaretçi.
                 // Kaynak home'da boş kalır; yalnız ridePoint verildiğinde doldurulur.
@@ -229,6 +286,16 @@ fun RencarMap(
                 map.addOnMapClickListener { point ->
                     val screen = map.projection.toScreenLocation(point)
                     val rect = RectF(screen.x - slop, screen.y - slop, screen.x + slop, screen.y + slop)
+                    // Kümeye dokunma → yakınlaş (küme açılır). clusterMaxZoom'a kadar yaklaştıkça
+                    // kümeler bölünür; "zooma bağlı kümeleme"nin etkileşimli karşılığı.
+                    val clusterPoint = map.queryRenderedFeatures(rect, "clusters-layer")
+                        .firstOrNull()?.geometry() as? Point
+                    if (clusterPoint != null) {
+                        val target = LatLng(clusterPoint.latitude(), clusterPoint.longitude())
+                        val zoom = (map.cameraPosition.zoom + CLUSTER_ZOOM_STEP).coerceAtMost(MAX_CLUSTER_ZOOM)
+                        map.animateCamera(CameraUpdateFactory.newLatLngZoom(target, zoom))
+                        return@addOnMapClickListener true
+                    }
                     // Yalnızca müsait araç balonları detay açar; gri "Kullanımda" araçlar
                     // non-owner'a 404 döndüğünden tıklama yok sayılır ("available" == "true").
                     val feature = map.queryRenderedFeatures(rect, "vehicles-layer")
