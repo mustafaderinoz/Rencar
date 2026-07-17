@@ -430,3 +430,29 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan dosyalar:** `data/remote/dto/RentalDtos` (CreateRentalRequest.endDate), `data/repository/RentalRepository` (createDailyRental + isoUtcFromNow), `ui/reservation/{ReservationContract,ReservationViewModel,ReservationScreen}`, `ui/navigation/RencarNavHost`.
 
 - Not (17.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Uçtan uca cihazda DENENMEDİ.
+
+---
+
+### Çıkış Yap (Logout) — `POST /auth/logout`
+
+- Seçim: **Profil ekranındaki "Çıkış yap" butonu onay pop-up'ıyla aktifleştirildi: onaylanınca `POST /auth/logout` (sunucudaki aktif refresh oturumlarını iptal eder) çağrılır, ardından YEREL oturum kapatılır ve kullanıcı Login'e döner (tüm backstack temizlenir).** Yerel oturum kapatma + Login'e yönlendirme, mevcut `SessionManager.forcedLogout` → `MainViewModel` → `RencarNavHost` zinciri YENİDEN KULLANILARAK yapılır — navigasyon tarafında sıfır değişiklik ("Minimum Değişiklik İlkesi").
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Alternatifler: **Navigasyon callback'ini `RencarNavHost` → `HomeScreen` → `ProfileScreen` boyunca geçirmek** — 3 ekstra dosyaya dokunur, `ProfileScreen`'in (WalletScreen gibi) kendi kendine yeten yapısını bozar ve `forcedLogout` LaunchedEffect'inin zaten yaptığı navigasyonu (Login + `popUpTo(graph.id){inclusive}`) tekrarlardı. **Onay pop-up'sız doğrudan çıkış** — kullanıcı onay pop-up'ı istedi (kart-silme kalıbı).
+
+- Sebep: `ProfileScreen`, Home'un nested tab NavHost'unda navigasyon callback'i ALMADAN çağrılır; kök NavHost'taki Login'e doğrudan erişimi yoktur. `forcedLogout` olayının semantiği zaten "oturum bitti → Login'e git, backstack temizle"dir (refresh-hatası yalnızca BİR tetikleyici); kullanıcı-tetikli çıkış ikinci tetikleyici olarak aynı yolu kullanır.
+
+- **Yeni bağımlılık YOK.** Mevcut Retrofit + Hilt + Compose yeterli; yeni DTO da yok.
+
+- **Kararlar/sapmalar:**
+  - **Ağ çağrısı `AuthApi` (ana istemci) üzerinden, `RefreshApi` DEĞİL:** `/auth/logout` access token ister; `RefreshApi` Authenticator'sız + token eklemeyen sade istemcidir (DI-döngü çözümü). Token'ı `AuthInterceptor` yalnız ana istemcide ekler.
+  - **"Her durumda çıkış":** `AuthRepository.logout()` içinde sunucu çağrısı `runCatching{...}.also { sessionManager.logout() }` ile sarılır — ağ başarısız olsa BİLE yerel oturum (token temizle + olay) kapatılır; kullanıcı çıkar. Sunucuya ulaşılamazsa eldeki refresh token kısa ömrü dolunca zaten çürür. Yanıt gövdesi (`MessageResponseDto`) kullanılmaz → `Response<Unit>` (CardApi.remove kalıbı) + `Result<Unit>`.
+  - **DI döngüsü yok:** `AuthRepository` artık `SessionManager` enjekte eder; `SessionManager` yalnız `RefreshApi`+`TokenStore`'a bağlıdır (AuthRepository/AuthApi'ye geri bağlanmaz). Hilt derlemede doğruladı.
+  - **`SessionManager.logout()` (public) eklendi:** mevcut private `forceLogout()` gövdesini (clear + emit) yeniden kullanır; iki tetikleyici (kullanıcı çıkışı / refresh-hatası) tek yerel-kapatma + tek navigasyon yoluna iner.
+  - **Onay pop-up'ı ViewModel state'inde (`showLogoutConfirm`), yerel `remember` DEĞİL:** stateless gövde (§4.5) saf kalır (yalnız `uiState`+`onIntent`); WalletScreen `DeleteCardDialog` kalıbıyla tutarlı. Çıkış sürerken (`isLoggingOut`) onay butonunda spinner + tekrar-basma/dışına-dokunma engeli.
+  - Navigasyon §4.6'ya uygun: `ProfileViewModel`'e Effect kanalı EKLENMEDİ; oturum-sonu olayını NavHost dinler, ekran zaten backstack'ten çıkar.
+
+- **Dokunulan/eklenen dosyalar:** güncellenen `data/remote/api/AuthApi` (logout), `data/remote/session/SessionManager` (public logout), `data/repository/AuthRepository` (logout + SessionManager inject), `ui/profile/{ProfileContract,ProfileViewModel,ProfileScreen}` (Logout intent/state + onay pop-up).
+
+- Not (17.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Uçtan uca cihazda DENENMEDİ (giriş yapmış oturum gerekir).

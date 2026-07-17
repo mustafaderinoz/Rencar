@@ -18,7 +18,8 @@ import retrofit2.HttpException
 /**
  * Profil ekranının tek durum kaynağı (§4.4). GET /auth/me ile ad/telefon, GET /license/status
  * ile ehliyet doğrulama durumu çekilir (statik değil). Ayrı domain/UseCase katmanı yoktur
- * (data + repository, decisions.md). Menü/çıkış aksiyonları bu iş kapsamında bağlanmaz (§4.6).
+ * (data + repository, decisions.md). "Çıkış yap" onay pop-up'ıyla POST /auth/logout'a bağlıdır;
+ * menü satırları bu iş kapsamında bağlanmaz (§4.6).
  */
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
@@ -32,6 +33,23 @@ class ProfileViewModel @Inject constructor(
     fun onIntent(intent: ProfileIntent) {
         when (intent) {
             ProfileIntent.Load, ProfileIntent.Retry -> load()
+            ProfileIntent.LogoutClicked -> _uiState.update { it.copy(showLogoutConfirm = true) }
+            ProfileIntent.DismissLogout -> _uiState.update { it.copy(showLogoutConfirm = false) }
+            ProfileIntent.ConfirmLogout -> logout()
+        }
+    }
+
+    /**
+     * Oturumu kapatır: [AuthRepository.logout] sunucu oturumlarını iptal edip YEREL oturumu kapatır;
+     * bunun yayınladığı oturum-sonu olayını NavHost dinleyip kullanıcıyı login'e yönlendirir (ekran
+     * bu sırada zaten geri yığından çıkar). Bu yüzden başarı/hata için ayrı state güncellemesi yok;
+     * yalnız tekrar-basmaya karşı [ProfileUiState.isLoggingOut] koruması tutulur.
+     */
+    private fun logout() {
+        if (_uiState.value.isLoggingOut) return
+        _uiState.update { it.copy(isLoggingOut = true) }
+        viewModelScope.launch {
+            authRepository.logout()
         }
     }
 

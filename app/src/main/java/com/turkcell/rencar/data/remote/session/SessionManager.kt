@@ -74,6 +74,15 @@ class SessionManager @Inject constructor(
         )
     }
 
+    /**
+     * Kullanıcı isteğiyle YEREL oturumu kapatır: token'ları temizler ve oturum-sonu olayını yayınlar
+     * (UI login'e döner). Sunucudaki refresh oturumlarının iptali AYRIDIR ve
+     * [com.turkcell.rencar.data.repository.AuthRepository.logout] içinde (POST /auth/logout) yapılır.
+     * Refresh-hatası kaynaklı sert logout ([refreshSession]) ile AYNI olayı ([forcedLogout]) yayınlar
+     * — her iki durumda da NavHost kullanıcıyı login'e yönlendirir (tek navigasyon yolu).
+     */
+    suspend fun logout() = forceLogout()
+
     /** Token'ları temizler ve oturum-sonu olayını yayınlar (login'e yönlendirme UI'da yapılır). */
     private suspend fun forceLogout() {
         tokenStore.clear()

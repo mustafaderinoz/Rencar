@@ -9,6 +9,7 @@ import com.turkcell.rencar.data.remote.api.AuthApi
 import com.turkcell.rencar.data.remote.dto.LoginRequest
 import com.turkcell.rencar.data.remote.dto.RegisterRequest
 import com.turkcell.rencar.data.remote.dto.VerifyOtpRequest
+import com.turkcell.rencar.data.remote.session.SessionManager
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,6 +22,7 @@ import javax.inject.Singleton
 class AuthRepository @Inject constructor(
     private val authApi: AuthApi,
     private val tokenStore: TokenStore,
+    private val sessionManager: SessionManager,
 ) {
     /**
      * Yeni kullanıcı kaydı (POST /auth/register); kullanıcı PENDING rolüyle oluşur.
@@ -73,4 +75,19 @@ class AuthRepository @Inject constructor(
     suspend fun me(): Result<UserUi> = runCatching {
         authApi.me().toUi()
     }
+
+    /**
+     * Kullanıcı isteğiyle çıkış (Profil → "Çıkış yap").
+     *
+     * Önce sunucudaki aktif refresh oturumlarını iptal eder (POST /auth/logout, access token'la),
+     * ARDINDAN [SessionManager] üzerinden YEREL oturumu kapatır (token temizle + oturum-sonu olayı →
+     * NavHost login'e döner). Yerel kapatma [also] ile HER DURUMDA çalışır: ağ çağrısı başarısız olsa
+     * bile ("her durumda çıkış") kullanıcı çıkar; sunucuya ulaşılamazsa eldeki refresh token kısa
+     * ömrü dolunca zaten çürür. Yanıt gövdesi kullanılmaz → Result<Unit> (login/register kalıbı).
+     */
+    suspend fun logout(): Result<Unit> = runCatching {
+        authApi.logout()
+    }.also {
+        sessionManager.logout()
+    }.map { }
 }
