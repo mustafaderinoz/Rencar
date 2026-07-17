@@ -109,6 +109,38 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - Not (15.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** `RideLocationClient`'in socket `connect_error → refresh → reconnect` dalı da geri bağlandı (aşağıdaki "Aktif Yolculuk" sapma notuna bakınız).
 
 
+### Kayıt Ekranı (Register) — `POST /auth/register`
+
+- Seçim: **Login'de girilen numara kayıtlı DEĞİLSE (`POST /auth/login` → 401) kullanıcı otomatik olarak yeni `register?phone={phone}` ekranına alınır** (numara taşınır, düzenlenebilir kalır). Alanlar: Ad Soyad · E-posta · Şifre · Telefon (zorunlu) + **Davet kodu (isteğe bağlı)**. Kayıt başarılı olunca API **201 ile token çifti dönse de bu token BİLİNÇLİ OLARAK YOK SAYILIR**; kullanıcı Login'e geri döner ve normal OTP akışıyla giriş yapar. Login'in alt "Kayıt ol" linki de aynı ekranı açar (numara boş gelebilir).
+
+- Son Güncelleme Tarihi: 17.07.2026
+
+- Alternatifler: **Token'ı kaydedip doğrudan Home/Ehliyet'e geçmek** (kayıt sonrası 2. bir adım gerekmez; kullanıcı AÇIKÇA reddetti — telefon OTP ile doğrulanmadan oturum açılmasın). **Kullanıcının tarif ettiği "OTP → kayıtsızsa register" akışı** — backend'de KARŞILIĞI YOK (aşağıya bakınız).
+
+- **Akış sapması (§2.2 uydurmak yasak — kullanıcıya sorulup onaylandı):** İstenen akış "telefon → OTP → kod gir → numara kayıtlı değilse register" idi. Backend bunu **yapamaz**: `POST /auth/login` kayıtsız numaraya **OTP GÖNDERMEZ**, doğrudan **401** döner (canlı v2 ile curl doğrulandı: `{"message":"Bu telefon numarasına kayıtlı kullanıcı bulunamadı."}`). "Telefon kayıtlı mı?" ucu da yoktur. Bu yüzden kayıtsızlık **ancak "Kod Gönder" adımında** anlaşılır ve yeni kullanıcı için OTP adımı **atlanır**. Kayıt sonrası Login'e dönüldüğünde numara OTP'den geçtiği için doğrulama yine de yapılmış olur.
+
+- Sebep: `LoginViewModel` 401'i zaten "Bu telefon numarasına kayıtlı kullanıcı yok." çıkmaz sokağına çeviriyordu ve `LoginScreen`'deki "Kayıt ol" linki no-op'tu; ikisi de bu ekranı bekliyordu. 401 artık hata değil, **kayıt akışına yönlendirme sinyalidir** (`LoginUiState.navigateToRegister`).
+
+- **DTO izolasyonu korunur (decisions.md "Katman Derinliği"):** yeni `RegisterRequest` DTO'su; `AuthRepository.register()` **`Result<Unit>`** döner (token kaydedilmediğinden yanıt kullanılmaz — `login`/`reserve`/`upload` ile aynı kalıp). Hata, **tiplenmiş `RegisterError`** (data/model) olarak `RegisterException` içinde taşınır; HTTP gövdesini ayrıştırma **yalnız mapper katmanındadır** (`AuthMapper.toRegisterError`), `ui/register/*` içinde `data.remote.dto` importu yoktur.
+
+- **Yeni bağımlılık YOK.** Mevcut Retrofit + kotlinx.serialization + Hilt + Compose yeterli.
+
+- **Kararlar/sapmalar:**
+  - **409 belirsizliği (mapper'ın var oluş sebebi):** E-posta ve telefon çakışmasının **İKİSİ DE 409** döner; **yalnızca gövde metni ayırır** ("Bu e-posta adresi zaten kayıtlı." / "Bu telefon numarası zaten kayıtlı."). Alan-bazlı hata için gövde okunur ve anahtar kelimeyle (`e-posta`/`telefon`) ayrıştırılır. Doğrulama 400'ü de bu kelimeleri içerdiğinden (`"Geçerli bir e-posta adresi giriniz."`) çakışma dalları **`code() == 409` koşuluna bağlıdır**. Sunucu metni değişirse tek dosya (`AuthMapper`) güncellenir.
+  - **`message` alanı çift şekilli:** 409/davet-kodu-400'de tek `String`, alan doğrulama 400'ünde `List<String>`. Mapper ikisini de tek listeye indirger; eşlenemeyen 400/409'da sunucunun kendi Türkçe metni gösterilir (metin uydurulmaz).
+  - **Davet kodu:** boş/yalnız-boşluk ise `null`'a çevrilir ve `explicitNulls = false` sayesinde gövdeye **hiç yazılmaz** (openapi: geçersiz kod 400 → `"Davet kodu geçersiz."` → `referralCodeError`).
+  - **Şifre:** `RegisterDto` zorunlu kılar (min 6) ama giriş parolasız OTP olduğundan **bir daha kullanılmaz** — backend sözleşmesi böyle, uydurma değil. Göz (reveal) ikonu `RencarIcons`'ta ve tasarımda olmadığından **eklenmedi** (§2.2).
+  - **Telefon prefill ama kilitli DEĞİL:** "Kayıt ol" linkinden gelindiğinde numara boş olabildiğinden tek davranış (hep düzenlenebilir) seçildi; token yok sayıldığı için yanlış numara zararsız (kullanıcı neyle kaydolduysa onunla giriyor).
+  - **Login'e dönüş `popBackStack(LOGIN, inclusive = false)` ile yapılır** (navigate DEĞİL): geri yığındaki Login girdisi korunduğundan `LoginViewModel` yaşar ve **girilen numara alanda kalır**.
+  - **"Kaydın tamamlandı" bilgisi — VM'de DEĞİL:** bayrak Login'in `NavBackStackEntry.savedStateHandle`'ına yazılır. Bu handle, Hilt'in VM'e enjekte ettiği `SavedStateHandle` ile **AYNI NESNE DEĞİLDİR** (entry kendi iç `SavedStateViewModel`'ini kullanır) — VM'den okunsa bayrak hiç görünmezdi. Bu yüzden `RencarNavHost` okuyup `LoginScreen`'e parametre geçirir; stateless gövde yalnız `LoginUiState` görmeye devam eder (§4.5).
+  - **Telefon alanı ortaklaştırıldı:** `CountryCodeBox` + `PhoneVisualTransformation` `LoginScreen`'den `ui/components/PhoneField`'a taşındı (kopyalanmadı); Login davranışı değişmedi.
+  - Navigasyon ekran katmanında (`LaunchedEffect(registered)` → `onRegistered`); VM'de Effect kanalı eklenmedi (§4.6).
+
+- **Dokunulan/eklenen dosyalar:** yeni `data/model/RegisterError`, `ui/components/PhoneField`, `ui/register/{RegisterContract,RegisterViewModel,RegisterScreen}`; güncellenen `data/remote/dto/AuthDtos` (RegisterRequest), `data/remote/api/AuthApi` (register), `data/mapper/AuthMapper` (toRegisterError), `data/repository/AuthRepository` (register), `ui/login/{LoginContract,LoginViewModel,LoginScreen}`, `ui/navigation/{RencarDestinations,RencarNavHost}`.
+
+- Not (17.07.2026): **KOD HİZALANDI — `:app:installDebug` başarılı; akış emülatörde uçtan uca sürüldü.** Doğrulananlar: kayıtsız numara → 401 → Register (numara taşındı) · geçersiz davet kodu → alan hatası (kullanıcı oluşmadı) · kayıt → Login'e dönüş + numara korundu + bilgi satırı · **uygulama yeniden başlatıldığında Onboarding geldi (Home DEĞİL) → token gerçekten kaydedilmiyor** · aynı numarayla giriş → OTP → Ehliyet Doğrulama (PENDING) · aynı e-posta → e-posta alanı hatası · aynı telefon → telefon alanı hatası · geçersiz e-posta/kısa şifre → yerel doğrulama.
+
+
 ### Açılışta Oturum Geri Yükleme (Session Restore / Splash)
 
 - Seçim: **Yeni `SPLASH` başlangıç ekranı** (MVI §4 kalıbı: `ui/splash/{SplashContract,SplashViewModel,SplashScreen}`). Uygulama açılışında saklı access token varsa `GET /auth/me` çağrılır; **süresi dolmuş access token, `TokenAuthenticator` üzerinden refresh token'la sessizce yenilenir** (yukarıdaki "Oturum Yönetimi & Token Yenileme" altyapısını doğrudan kullanır). Sonuca göre yönlendirilir: token yok → Onboarding; `me()` başarılı → rol/ehliyet durumuna göre Home/License/LicensePending; **401** (refresh de öldü, oturum temizlendi) → Login; ağ hatası → "Tekrar Dene". `startDestination` `ONBOARDING`'den `SPLASH`'e çevrildi.

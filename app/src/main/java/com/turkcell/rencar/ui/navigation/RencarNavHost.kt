@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -22,6 +24,7 @@ import com.turkcell.rencar.ui.licensepending.LicensePendingScreen
 import com.turkcell.rencar.ui.onboarding.OnboardingScreen
 import com.turkcell.rencar.ui.otp.OtpVerificationScreen
 import com.turkcell.rencar.ui.payment.PaymentScreen
+import com.turkcell.rencar.ui.register.RegisterScreen
 import com.turkcell.rencar.ui.rentalphotos.RentalPhotosScreen
 import com.turkcell.rencar.ui.reservation.ReservationScreen
 import com.turkcell.rencar.ui.selfie.SelfieScreen
@@ -89,11 +92,49 @@ fun RencarNavHost(
             )
         }
         // Login: telefon girildikten sonra "Kod Gönder" ile numara OTP ekranına path argümanı olarak iletilir.
-        composable(RencarDestinations.LOGIN) {
+        composable(RencarDestinations.LOGIN) { entry ->
+            // Kayıt ekranı Login'e dönerken sonucu BU girdinin savedStateHandle'ına yazar; VM'e
+            // enjekte edilen handle ayrı nesne olduğundan bayrak burada okunup ekrana verilir.
+            val justRegistered by entry.savedStateHandle
+                .getStateFlow(RencarDestinations.LOGIN_RESULT_JUST_REGISTERED, false)
+                .collectAsStateWithLifecycle()
+
             LoginScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onNavigateToOtp = { phone ->
                     navController.navigate(RencarDestinations.otpRoute(phone))
+                },
+                // Numara kayıtlı değil (401) ya da "Kayıt ol" linki → kayıt ekranı; numara taşınır.
+                onNavigateToRegister = { phone ->
+                    navController.navigate(RencarDestinations.registerRoute(phone))
+                },
+                justRegistered = justRegistered,
+                onJustRegisteredShown = {
+                    entry.savedStateHandle[RencarDestinations.LOGIN_RESULT_JUST_REGISTERED] = false
+                },
+            )
+        }
+        // Kayıt: telefon İSTEĞE BAĞLI query argümanıdır (RegisterViewModel SavedStateHandle ile okur;
+        // "Kayıt ol" linkinden boş gelebilir). Kayıt başarılı olduğunda API token DÖNSE DE bilinçli
+        // olarak kullanılmaz (bkz. AuthRepository.register): kullanıcı Login'e döner ve normal OTP
+        // akışıyla giriş yapar.
+        composable(
+            route = RencarDestinations.REGISTER_ROUTE,
+            arguments = listOf(
+                navArgument(RencarDestinations.REGISTER_ARG_PHONE) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) {
+            RegisterScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onRegistered = {
+                    // Login'e DÖNÜLÜR (yeniden kurulmaz): geri yığındaki girdi korunduğu için
+                    // kullanıcının girdiği numara alanda kalır, hemen "Kod Gönder"e basabilir.
+                    navController.getBackStackEntry(RencarDestinations.LOGIN)
+                        .savedStateHandle[RencarDestinations.LOGIN_RESULT_JUST_REGISTERED] = true
+                    navController.popBackStack(RencarDestinations.LOGIN, inclusive = false)
                 },
             )
         }
