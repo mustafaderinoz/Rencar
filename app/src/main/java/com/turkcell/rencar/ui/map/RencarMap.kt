@@ -408,7 +408,7 @@ private fun updateVehicles(
             val bitmap = VehicleMarkers.build(
                 context = context,
                 label = VehicleMarkers.labelFor(vehicle.status, vehicle.pricePerDay),
-                backgroundColor = if (isRecommended) VehicleMarkers.CAT_AI else baseColor,
+                backgroundColor = baseColor,
                 glow = available || isRecommended,
             )
             style.addImage(iconId, bitmap)

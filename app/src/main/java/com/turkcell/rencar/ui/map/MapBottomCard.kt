@@ -141,7 +141,13 @@ fun MapBottomCard(
                                 text = title,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = if (recommendedCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                color = when {
+                                    recommendedCount > 0 && selectedSegment == "ECONOMY" -> CatEconomy
+                                    recommendedCount > 0 && selectedSegment == "COMFORT" -> CatComfort
+                                    recommendedCount > 0 && selectedSegment == "SUV" -> CatSuv
+                                    recommendedCount > 0 -> LightPrimary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
                             )
                             val subtitle = buildSubtitle(localityName, nearestDistanceMeters)
                             if (subtitle != null) {
@@ -155,11 +161,18 @@ fun MapBottomCard(
                         }
 
                         val hasAiResults = recommendedCount > 0
+                        val aiColor = when {
+                            hasAiResults && selectedSegment == "ECONOMY" -> CatEconomy
+                            hasAiResults && selectedSegment == "COMFORT" -> CatComfort
+                            hasAiResults && selectedSegment == "SUV" -> CatSuv
+                            else -> LightPrimary
+                        }
+
                         Surface(
                             onClick = onAiClick,
                             shape = CircleShape,
-                            color = if (hasAiResults) LightPrimary else LightPrimary.copy(alpha = 0.1f),
-                            contentColor = if (hasAiResults) LightOnPrimary else LightPrimary,
+                            color = if (hasAiResults) aiColor else aiColor.copy(alpha = 0.1f),
+                            contentColor = if (hasAiResults) LightOnPrimary else aiColor,
                             modifier = Modifier.size(44.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {

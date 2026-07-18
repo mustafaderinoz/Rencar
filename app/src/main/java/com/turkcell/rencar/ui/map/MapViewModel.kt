@@ -83,9 +83,14 @@ class MapViewModel @Inject constructor(
                 _uiState.update { it.copy(recommendedVehicleIds = emptySet()).withDerived() }
 
             is MapIntent.SetAiRecommendations ->
-                _uiState.update { 
-                    it.copy(
+                _uiState.update { state ->
+                    val recommendedVehicles = state.vehicles.filter { it.id in intent.ids }
+                    val distinctSegments = recommendedVehicles.mapNotNull { it.segment }.distinct()
+                    val inferredSegment = if (distinctSegments.size == 1) distinctSegments.first() else null
+
+                    state.copy(
                         recommendedVehicleIds = intent.ids,
+                        selectedSegment = inferredSegment ?: state.selectedSegment,
                         bottomCardExpanded = true // Sonuçlar gelince kartı aç ki sayı değişimi görülsün
                     ).withDerived()
                 }
