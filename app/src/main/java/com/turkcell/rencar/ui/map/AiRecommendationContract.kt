@@ -1,5 +1,7 @@
 package com.turkcell.rencar.ui.map
 
+import com.turkcell.rencar.data.model.VehicleUi
+
 /**
  * AI Önerisi UI Durumu.
  */
@@ -21,7 +23,7 @@ sealed interface AiRecommendationIntent {
     /** Sorgu metni değişti. */
     data class QueryChanged(val query: String) : AiRecommendationIntent
     /** Sorgu gönderildi. */
-    data object Submit : AiRecommendationIntent
+    data class Submit(val vehicles: List<VehicleUi>) : AiRecommendationIntent
     /** Öneriler temizlendi. */
     data object Clear : AiRecommendationIntent
 }

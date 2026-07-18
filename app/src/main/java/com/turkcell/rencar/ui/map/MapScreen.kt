@@ -183,7 +183,7 @@ fun MapScreen(
         AiRecommendationDialog(
             vehicles = uiState.vehicles,
             onDismiss = { viewModel.onIntent(MapIntent.AiDismissed) },
-            onResult = { ids -> viewModel.onIntent(MapIntent.SetAiRecommendations(ids)) }
+            onApply = { ids -> viewModel.onIntent(MapIntent.SetAiRecommendations(ids)) },
         )
     }
 }

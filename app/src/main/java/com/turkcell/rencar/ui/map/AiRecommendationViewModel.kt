@@ -23,13 +23,13 @@ class AiRecommendationViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AiRecommendationUiState())
     val uiState: StateFlow<AiRecommendationUiState> = _uiState.asStateFlow()
 
-    fun onIntent(intent: AiRecommendationIntent, vehicles: List<VehicleUi>) {
+    fun onIntent(intent: AiRecommendationIntent) {
         when (intent) {
             is AiRecommendationIntent.QueryChanged -> {
                 _uiState.update { it.copy(query = intent.query, error = null) }
             }
-            AiRecommendationIntent.Submit -> {
-                recommend(vehicles)
+            is AiRecommendationIntent.Submit -> {
+                recommend(intent.vehicles)
             }
             AiRecommendationIntent.Clear -> {
                 _uiState.update { AiRecommendationUiState() }
