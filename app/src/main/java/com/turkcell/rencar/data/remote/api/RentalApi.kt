@@ -7,6 +7,7 @@ import com.turkcell.rencar.data.remote.dto.PayRentalRequest
 import com.turkcell.rencar.data.remote.dto.PayRentalResponse
 import com.turkcell.rencar.data.remote.dto.RentalPhotosState
 import com.turkcell.rencar.data.remote.dto.RentalResponse
+import com.turkcell.rencar.data.remote.dto.RentalStatsResponse
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -16,6 +17,7 @@ import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * Kiralama uçları (openapi.json — tag: Rentals). Auth zorunlu (AuthInterceptor Bearer ekler),
@@ -29,6 +31,20 @@ interface RentalApi {
      */
     @POST("rentals")
     suspend fun create(@Body body: CreateRentalRequest): RentalResponse
+
+    /**
+     * Giriş yapan müşterinin tüm kiralamaları, yeniden eskiye (RentalController_listMine).
+     * Kiralamalarım (Geçmiş) ekranı bu listeyi gösterir.
+     */
+    @GET("rentals")
+    suspend fun listMine(): List<RentalResponse>
+
+    /**
+     * Aylık yolculuk özeti (RentalController_stats). [month] YYYY-MM; verilmezse sunucu bu ayı
+     * (UTC) kullanır. Kiralamalarım başlığı ("Bu ay N yolculuk · ₺X harcama") bu uçtan beslenir.
+     */
+    @GET("rentals/stats")
+    suspend fun stats(@Query("month") month: String? = null): RentalStatsResponse
 
     /**
      * PREPARING kiralamaya bir yönün (FRONT/BACK/LEFT/RIGHT) fotoğrafını yükler

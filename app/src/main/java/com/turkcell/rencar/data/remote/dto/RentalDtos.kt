@@ -27,12 +27,13 @@ data class CreateRentalRequest(
 )
 
 /**
- * POST /rentals 201 + GET /rentals/{id} yanıtı (RentalResponseDto). Foto ekranı yalnızca kiralama
- * kimliğini ve araç özetini kullanır. Ödeme ekranı ise GET /rentals/{id} ile bitmiş kiralamanın
- * ücret dökümünü çeker: [totalPrice] toplam, [startFee] açılış, [serviceFee] hizmet bedeli
+ * POST /rentals 201 + GET /rentals/{id} + GET /rentals yanıtı (RentalResponseDto). Foto ekranı
+ * yalnızca kiralama kimliğini ve araç özetini kullanır. Ödeme ekranı ise GET /rentals/{id} ile bitmiş
+ * kiralamanın ücret dökümünü çeker: [totalPrice] toplam, [startFee] açılış, [serviceFee] hizmet bedeli
  * ("Kiralama ücreti" = totalPrice − startFee − serviceFee), [durationMinutes] süre etiketi ("(N dk)"),
- * [paymentStatus] UNPAID/PAID. Döküm alanları additive + nullable-default'tur (decisions.md
- * "Minimum Değişiklik") — create/start yanıtı bunları içermese de deserileştirme bozulmaz.
+ * [paymentStatus] UNPAID/PAID. Kiralamalarım listesi ayrıca [startedAt]/[createdAt] (kart tarihi) alanlarını
+ * kullanır. Döküm/tarih alanları additive + nullable-default'tur (decisions.md "Minimum Değişiklik") —
+ * create/start yanıtı bunları içermese de deserileştirme bozulmaz.
  */
 @Serializable
 data class RentalResponse(
@@ -47,6 +48,22 @@ data class RentalResponse(
     val distanceKm: Double = 0.0,
     val durationMinutes: Double = 0.0,
     val paymentStatus: String? = null,
+    val startedAt: String? = null,
+    val createdAt: String? = null,
+)
+
+/**
+ * GET /rentals/stats yanıtı (RentalStatsResponseDto) — seçilen aydaki (varsayılan: bu ay) TAMAMLANMIŞ
+ * yolculukların özeti. Kiralamalarım başlığı ("Bu ay {tripCount} yolculuk · ₺{totalSpent} harcama") bu
+ * uçtan beslenir. Sayısal alanlar "number" olduğundan Double alınır; boş ay sıfırlarla döner.
+ */
+@Serializable
+data class RentalStatsResponse(
+    val month: String = "",
+    val tripCount: Double = 0.0,
+    val totalSpent: Double = 0.0,
+    val totalMinutes: Double = 0.0,
+    val totalKm: Double = 0.0,
 )
 
 /** Kiralama yanıtındaki araç özeti (RentalVehicleSummaryDto). */

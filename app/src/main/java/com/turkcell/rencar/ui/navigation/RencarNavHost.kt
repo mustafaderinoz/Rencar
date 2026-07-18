@@ -1,5 +1,6 @@
 package com.turkcell.rencar.ui.navigation
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -169,8 +170,12 @@ fun RencarNavHost(
         }
         // Ehliyet doğrulama (1. adım): ön+arka çekilir, selfie ekranına yollar iletilir.
         composable(RencarDestinations.LICENSE) {
+            // Ehliyet ekranına gelinirken auth akışı geri yığından temizlendiği için (popUpTo …
+            // inclusive) çoğu senaryoda LICENSE tek girdidir; o durumda popBackStack() bir şey yapmaz.
+            // Ekran-içi ‹ butonu da sistem geri tuşu gibi davranıp uygulamadan çıksın (kök gate ekranı).
+            val activity = LocalActivity.current
             LicenseScreen(
-                onNavigateBack = { navController.popBackStack() },
+                onNavigateBack = { if (!navController.popBackStack()) activity?.finish() },
                 onNavigateToSelfie = { front, back ->
                     navController.navigate(RencarDestinations.selfieRoute(front, back))
                 },

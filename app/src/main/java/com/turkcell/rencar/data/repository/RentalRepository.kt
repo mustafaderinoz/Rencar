@@ -1,9 +1,12 @@
 package com.turkcell.rencar.data.repository
 
+import com.turkcell.rencar.data.mapper.toHistoryItem
 import com.turkcell.rencar.data.mapper.toUi
 import com.turkcell.rencar.data.model.ActiveRentalUi
+import com.turkcell.rencar.data.model.RentalHistoryItemUi
 import com.turkcell.rencar.data.model.RentalPhotosUi
 import com.turkcell.rencar.data.model.RentalReceiptUi
+import com.turkcell.rencar.data.model.RentalStatsUi
 import com.turkcell.rencar.data.model.RentalUi
 import com.turkcell.rencar.data.model.VehiclePoint
 import com.turkcell.rencar.data.remote.api.RentalApi
@@ -58,6 +61,20 @@ class RentalRepository @Inject constructor(
             ),
         ).toUi()
     }
+
+    /**
+     * GET /rentals: giriş yapan müşterinin tüm kiralamaları (yeniden eskiye), Kiralamalarım kartlarına
+     * dönüştürülmüş. Ağ/yetki hatası Result olarak çağırana taşınır (mesaj eşlemesi ViewModel'de).
+     */
+    suspend fun getMyRentals(): Result<List<RentalHistoryItemUi>> =
+        runCatching { rentalApi.listMine().map { it.toHistoryItem() } }
+
+    /**
+     * GET /rentals/stats: bu ayın (varsayılan) yolculuk özeti — Kiralamalarım başlığını besler.
+     * Ay parametresi gönderilmez; sunucu bu ayı kullanır.
+     */
+    suspend fun getMonthlyStats(): Result<RentalStatsUi> =
+        runCatching { rentalApi.stats().toUi() }
 
     /**
      * Bir yönün ([side] = FRONT/BACK/LEFT/RIGHT) fotoğrafını yükler. [file] uygulama iç depodaki

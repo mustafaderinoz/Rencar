@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,7 +90,9 @@ fun LicenseScreen(
     val context = LocalContext.current
 
     // Kamera akışı Android API'leriyle burada (ekran katmanı) yürür; sonuç intent'le VM'e gider.
-    var pendingSide by remember { mutableStateOf<LicenseSide?>(null) }
+    // rememberSaveable: kamera activity'si önlemdeyken host Activity yeniden yaratılırsa (emülatör /
+    // "aktiviteleri tutma" ayarı) düz remember sıfırlanıp sonuç düşerdi; bu şekilde yön korunur.
+    var pendingSide by rememberSaveable { mutableStateOf<LicenseSide?>(null) }
 
     fun fileFor(side: LicenseSide): File {
         val dir = File(context.filesDir, "licenses").apply { mkdirs() }
@@ -100,11 +103,16 @@ fun LicenseScreen(
         ActivityResultContracts.TakePicture(),
     ) { success ->
         val side = pendingSide
-        if (success && side != null) {
-            val path = fileFor(side).absolutePath
-            when (side) {
-                LicenseSide.FRONT -> viewModel.onIntent(LicenseIntent.FrontCaptured(path))
-                LicenseSide.BACK -> viewModel.onIntent(LicenseIntent.BackCaptured(path))
+        if (side != null) {
+            // Emülatör kamerası (ve bazı cihazlar) dosyayı yazsa da success=false döndürebiliyor;
+            // success'e körü körüne güvenmek yerine dosyanın gerçekten yazıldığını doğruluyoruz.
+            val file = fileFor(side)
+            if (success || file.length() > 0L) {
+                val path = file.absolutePath
+                when (side) {
+                    LicenseSide.FRONT -> viewModel.onIntent(LicenseIntent.FrontCaptured(path))
+                    LicenseSide.BACK -> viewModel.onIntent(LicenseIntent.BackCaptured(path))
+                }
             }
         }
         pendingSide = null
