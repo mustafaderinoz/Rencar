@@ -1,14 +1,11 @@
 package com.turkcell.rencar.ui.home
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -20,6 +17,7 @@ import androidx.navigation.compose.rememberNavController
 import com.turkcell.rencar.ui.map.MapScreen
 import com.turkcell.rencar.ui.navigation.RencarDestinations
 import com.turkcell.rencar.ui.profile.ProfileScreen
+import com.turkcell.rencar.ui.rentals.RentalsScreen
 import com.turkcell.rencar.ui.theme.RenCarTheme
 import com.turkcell.rencar.ui.wallet.WalletScreen
 
@@ -27,8 +25,7 @@ import com.turkcell.rencar.ui.wallet.WalletScreen
  * Alt navigasyonlu ana kabuk: [Scaffold] + [RencarBottomBar] + sekmelere özel nested
  * [NavHost]. Sekmeye basınca ilgili rotaya geçilir; sekme durumları (state) korunur.
  *
- * Sekme içerikleri şimdilik [PlaceholderScreen] — iskelet talebi gereği boş. Her sekme
- * içerik kazandıkça kendi `ui/<feature>/` MVI ekranına yükseltilir (§4.6).
+ * Her sekme kendi `ui/<feature>/` MVI ekranına bağlıdır (Harita/Geçmiş/Cüzdan/Profil).
  */
 @Composable
 fun HomeScreen(
@@ -68,25 +65,10 @@ fun HomeScreen(
             composable(RencarDestinations.MAP) {
                 MapScreen(onNavigateToReservation = onNavigateToReservation)
             }
-            composable(RencarDestinations.HISTORY) { PlaceholderScreen("Geçmiş") }
+            composable(RencarDestinations.HISTORY) { RentalsScreen() }
             composable(RencarDestinations.WALLET) { WalletScreen() }
             composable(RencarDestinations.PROFILE) { ProfileScreen() }
         }
-    }
-}
-
-// ── Geçici boş sekme içeriği: yalnızca ortada sekme adı (§4.6 minimal iskelet) ──
-@Composable
-private fun PlaceholderScreen(title: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

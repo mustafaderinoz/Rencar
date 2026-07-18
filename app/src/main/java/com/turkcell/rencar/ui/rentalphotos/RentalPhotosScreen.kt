@@ -31,7 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,7 +70,9 @@ fun RentalPhotosScreen(
     val context = LocalContext.current
 
     // Kamera akışı Android API'leriyle burada (ekran katmanı) yürür; sonuç intent'le VM'e gider.
-    var pendingSide by remember { mutableStateOf<PhotoSide?>(null) }
+    // rememberSaveable: kamera activity'si önlemdeyken host Activity yeniden yaratılırsa (emülatör /
+    // "aktiviteleri tutma" ayarı) düz remember sıfırlanıp sonuç düşerdi; bu şekilde yön korunur.
+    var pendingSide by rememberSaveable { mutableStateOf<PhotoSide?>(null) }
 
     fun fileFor(side: PhotoSide): File {
         val dir = File(context.filesDir, "rental-photos").apply { mkdirs() }
@@ -81,8 +83,13 @@ fun RentalPhotosScreen(
         ActivityResultContracts.TakePicture(),
     ) { success ->
         val side = pendingSide
-        if (success && side != null) {
-            viewModel.onIntent(RentalPhotosIntent.PhotoCaptured(side, fileFor(side).absolutePath))
+        if (side != null) {
+            // Emülatör kamerası (ve bazı cihazlar) dosyayı yazsa da success=false döndürebiliyor;
+            // dosyanın gerçekten yazıldığını doğrulayarak "foto eklenmiyor" durumunu önlüyoruz.
+            val file = fileFor(side)
+            if (success || file.length() > 0L) {
+                viewModel.onIntent(RentalPhotosIntent.PhotoCaptured(side, file.absolutePath))
+            }
         }
         pendingSide = null
     }

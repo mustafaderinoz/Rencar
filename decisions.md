@@ -456,3 +456,30 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** güncellenen `data/remote/api/AuthApi` (logout), `data/remote/session/SessionManager` (public logout), `data/repository/AuthRepository` (logout + SessionManager inject), `ui/profile/{ProfileContract,ProfileViewModel,ProfileScreen}` (Logout intent/state + onay pop-up).
 
 - Not (17.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Uçtan uca cihazda DENENMEDİ (giriş yapmış oturum gerekir).
+
+---
+
+### Kiralamalarım Ekranı (Geçmiş sekmesi) — `GET /rentals` + `GET /rentals/stats`
+
+- Seçim: **Home'un "Geçmiş" sekmesi (`RencarDestinations.HISTORY`) placeholder'dan gerçek MVI ekranına yükseltildi (§4.6).** Ekran: başlık ("Kiralamalarım") + aylık özet ("Bu ay N yolculuk · ₺X harcama", `GET /rentals/stats`) + kiralama kartları listesi (`GET /rentals`, yeniden eskiye). Her kart: dekoratif rota küçük görseli + araç adı + tarih + süre/mesafe rozetleri + tutar.
+
+- Son Güncelleme Tarihi: 18.07.2026
+
+- Alternatifler: **Yalnız COMPLETED kiralamaları göstermek** — kullanıcı "yapılan her yeni kiralama buraya eklenmeli" dediğinden tüm durumlar gösterilir. **Başlığı istemcide listeden türetmek** — kullanıcı başlığın `GET /rentals/stats` ile beslenmesini AÇIKÇA istedi (openapi de bu başlığı bu uca bağlar).
+
+- Sebep: Tasarımdaki Kiralamalarım ekranı. `GET /rentals` tüm kiralamaları (PREPARING/ACTIVE/COMPLETED/CANCELLED) yeniden eskiye döner; tutarı kilitlenmiş (tamamlanmış) kayıtta tutar ("₺110,50"), tutarı olmayan kayıtta durum etiketi ("Aktif"/"Hazırlanıyor"/"İptal edildi") gösterilir — böylece yeni açılan kiralamalar da listede belirir.
+
+- **Yeni bağımlılık YOK.** Mevcut Retrofit + kotlinx.serialization + Hilt + Compose yeterli.
+
+- **DTO izolasyonu korunur (bkz. "Katman Derinliği"):** `RentalResponse`'a `startedAt`/`createdAt` (kart tarihi) **additive + nullable-default** eklendi; yeni `RentalStatsResponse` DTO'su eklendi. `RentalResponse` → `RentalHistoryItemUi`, `RentalStatsResponse` → `RentalStatsUi` **`RentalMapper`** ile çevrilir; `ui/rentals/*` içinde `data.remote.dto` importu yoktur. Para biçimi mevcut `formatTl` (WalletMapper, `internal`) yeniden kullanıldı — kart tutarı "₺110,50", başlık harcaması `formatTlWhole` ile kuruşsuz "₺612".
+
+- **Kararlar/sapmalar:**
+  - **Rota küçük görseli DEKORATİFtir (§2.2):** API'de kiralamaya ait rota/polyline yoktur; kartın solundaki mavi güzergâh + uç noktaları Canvas ile temsilî çizilir (mahalle adı / Cüzdan marka çizimi emsalleri). Gerçek yol olduğu iddia edilmez.
+  - **Sekmeye her girişte tazeleme:** yükleme `init`'te değil `RentalsIntent.Load` ile; stateful sarmalayıcıdaki `LaunchedEffect(Unit)` sekme her göründüğünde tetikler. Listede veri varken tazeleme SESSİZDİR (spinner çakması yok); yalnız ilk açılışta (veri yokken) tam ekran spinner. Böylece başka akışta tamamlanan kiralama sekmeye dönünce görünür.
+  - **Kritik/ikincil ayrımı:** liste kritiktir (başarısızsa tam ekran hata + tekrar dene); aylık özet ikincildir (hatası sessizce yok sayılır, eldeki değer korunur) — Cüzdan ekranındaki cüzdan/kart ayrımıyla aynı kalıp.
+  - **Tarih biçimi:** kart "26 Haz 2026 · 14:32" (Türkçe ay kısaltması, `Locale("tr")`), tercihen `startedAt`, yoksa `createdAt`. minSdk 24 + desugaring kapalı → `SimpleDateFormat` (RentalMapper kalıbı; `parseIso` ortaklaştırıldı).
+  - Navigasyon yok — ekran Home sekmesi içinde kendi kendine yeten (`hiltViewModel()`); `RencarDestinations`/`RencarNavHost` değişmedi. §4.6 gereği Effect kanalı eklenmedi.
+
+- **Dokunulan/eklenen dosyalar:** yeni `ui/rentals/{RentalsContract,RentalsViewModel,RentalsScreen}`; güncellenen `data/remote/dto/RentalDtos` (RentalResponse.startedAt/createdAt + RentalStatsResponse), `data/remote/api/RentalApi` (listMine + stats), `data/model/RentalUi` (RentalHistoryItemUi + RentalStatsUi), `data/mapper/RentalMapper` (toHistoryItem + stats toUi + tarih/km biçimleri), `data/repository/RentalRepository` (getMyRentals + getMonthlyStats), `ui/home/HomeScreen` (placeholder → RentalsScreen).
+
+- Not (18.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Uçtan uca cihazda DENENMEDİ (giriş yapmış CUSTOMER oturumu gerekir).
