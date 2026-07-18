@@ -163,12 +163,29 @@ fun MapScreen(
                     }
                 }
 
+                MapIntent.AiClicked -> {
+                    if (uiState.recommendedVehicleIds.isNotEmpty()) {
+                        viewModel.onIntent(MapIntent.ClearAiRecommendations)
+                    } else {
+                        viewModel.onIntent(MapIntent.AiClicked)
+                    }
+                }
+
                 else -> viewModel.onIntent(intent)
             }
         },
         onNavigateToReservation = onNavigateToReservation,
         modifier = modifier,
     )
+
+    // AI Önerisi Diyaloğu
+    if (uiState.showAiDialog) {
+        AiRecommendationDialog(
+            vehicles = uiState.vehicles,
+            onDismiss = { viewModel.onIntent(MapIntent.AiDismissed) },
+            onApply = { ids -> viewModel.onIntent(MapIntent.SetAiRecommendations(ids)) },
+        )
+    }
 }
 
 // ── Stateless gövde (§4.5): uiState + onIntent ile çizer; `controller` harita görünüm tutamacıdır ──
@@ -187,6 +204,7 @@ private fun MapScreen(
             modifier = Modifier.fillMaxSize(),
             controller = controller,
             vehicles = uiState.vehicles,
+            recommendedVehicleIds = uiState.recommendedVehicleIds,
             onVehicleClick = { id -> onIntent(MapIntent.VehicleClicked(id)) },
         )
 
@@ -267,10 +285,12 @@ private fun MapScreen(
                 localityName = uiState.localityName,
                 nearestDistanceMeters = uiState.nearestDistanceMeters,
                 selectedSegment = uiState.selectedSegment,
+                recommendedCount = uiState.recommendedVehicleIds.size,
                 expanded = uiState.bottomCardExpanded,
                 onToggle = { onIntent(MapIntent.ToggleBottomCard) },
                 onSegmentSelected = { onIntent(MapIntent.SegmentSelected(it)) },
                 onFindNearest = { onIntent(MapIntent.FindNearest) },
+                onAiClick = { onIntent(MapIntent.AiClicked) },
             )
         }
 

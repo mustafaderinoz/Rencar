@@ -77,12 +77,19 @@ fun MapBottomCard(
     localityName: String?,
     nearestDistanceMeters: Float?,
     selectedSegment: String?,
+    recommendedCount: Int = 0,
     expanded: Boolean,
     onToggle: () -> Unit,
     onSegmentSelected: (String?) -> Unit,
     onFindNearest: () -> Unit,
+    onAiClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val title = remember(availableCount, recommendedCount) {
+        if (recommendedCount > 0) "AI Önerisi: $recommendedCount araç"
+        else "Yakınında $availableCount araç"
+    }
+
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -123,21 +130,59 @@ fun MapBottomCard(
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
                 ) {
 
-                    // Başlık + altyazı.
-                    Text(
-                        text = "Yakınında $availableCount araç",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    val subtitle = buildSubtitle(localityName, nearestDistanceMeters)
-                    if (subtitle != null) {
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                    // Başlık + AI butonu
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = when {
+                                    recommendedCount > 0 && selectedSegment == "ECONOMY" -> CatEconomy
+                                    recommendedCount > 0 && selectedSegment == "COMFORT" -> CatComfort
+                                    recommendedCount > 0 && selectedSegment == "SUV" -> CatSuv
+                                    recommendedCount > 0 -> LightPrimary
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                            val subtitle = buildSubtitle(localityName, nearestDistanceMeters)
+                            if (subtitle != null) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = subtitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+
+                        val hasAiResults = recommendedCount > 0
+                        val aiColor = when {
+                            hasAiResults && selectedSegment == "ECONOMY" -> CatEconomy
+                            hasAiResults && selectedSegment == "COMFORT" -> CatComfort
+                            hasAiResults && selectedSegment == "SUV" -> CatSuv
+                            else -> LightPrimary
+                        }
+
+                        Surface(
+                            onClick = onAiClick,
+                            shape = CircleShape,
+                            color = if (hasAiResults) aiColor else aiColor.copy(alpha = 0.1f),
+                            contentColor = if (hasAiResults) LightOnPrimary else aiColor,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = if (hasAiResults) RencarIcons.Close else RencarIcons.Sparkles,
+                                    contentDescription = if (hasAiResults) "Filtreyi Temizle" else "AI Önerisi",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                     }
 
                     Spacer(Modifier.height(14.dp))
@@ -247,10 +292,12 @@ private fun MapBottomCardDarkPreview() {
             localityName = "Kadıköy",
             nearestDistanceMeters = 240f,
             selectedSegment = null,
+            recommendedCount = 3,
             expanded = true,
             onToggle = {},
             onSegmentSelected = {},
             onFindNearest = {},
+            onAiClick = {},
         )
     }
 }
@@ -268,6 +315,7 @@ private fun MapBottomCardLightPreview() {
             onToggle = {},
             onSegmentSelected = {},
             onFindNearest = {},
+            onAiClick = {},
         )
     }
 }

@@ -28,6 +28,7 @@ object VehicleMarkers {
     private const val CAT_COMFORT = 0xFF7C4DFF.toInt()  // CatComfort (🟣)
     private const val CAT_ELECTRIC = 0xFF14B8A6.toInt() // CatElectric (🟢)
     private const val CAT_BUSY = 0xFF64748B.toInt()     // CatBusy (⚪ Kullanımda)
+    const val CAT_AI = 0xFF8B5CF6.toInt()               // AI Önerisi (🟣 Indigo/Violet)
 
     /** Araç AVAILABLE mı (marker rengi/etiketi/tıklanabilirliği buna bağlıdır). */
     fun isAvailable(status: String): Boolean = status.uppercase() == "AVAILABLE"

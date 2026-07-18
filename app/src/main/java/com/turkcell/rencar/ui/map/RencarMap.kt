@@ -134,6 +134,7 @@ fun RencarMap(
     initialZoom: Double = DEFAULT_ZOOM,
     controller: RencarMapController? = null,
     vehicles: List<VehicleUi> = emptyList(),
+    recommendedVehicleIds: Set<String> = emptySet(),
     onVehicleClick: (String) -> Unit = {},
     ridePoint: LatLng? = null,
 ) {
@@ -322,9 +323,15 @@ fun RencarMap(
 
     // Araç balonları -> vehicles listesi her değiştiğinde bitmap'ler eklenir/temizlenir.
     val addedIconIds = remember { mutableSetOf<String>() }
-    LaunchedEffect(mapAndStyle, vehicles) {
+    LaunchedEffect(mapAndStyle, vehicles, recommendedVehicleIds) {
         val (_, style) = mapAndStyle ?: return@LaunchedEffect
-        updateVehicles(context, style, vehicles, addedIconIds)
+        // Sadece müsait olanları VE (eğer AI varsa) AI önerisi olanları filtreleyerek gönder
+        val filteredVehicles = if (recommendedVehicleIds.isNotEmpty()) {
+            vehicles.filter { it.id in recommendedVehicleIds }
+        } else {
+            vehicles
+        }
+        updateVehicles(context, style, filteredVehicles, recommendedVehicleIds, addedIconIds)
     }
 
     // Aktif yolculuk pin'i -> ridePoint her değiştiğinde işaretçi güncellenir ve kamera onu takip
@@ -377,13 +384,14 @@ private fun updateVehicles(
     context: Context,
     style: Style,
     vehicles: List<VehicleUi>,
+    recommendedVehicleIds: Set<String>,
     addedIconIds: MutableSet<String>,
 ) {
     val source = style.getSourceAs<GeoJsonSource>("vehicles") ?: return
 
-    // İkon kimliği içeriğe göre imzalanır (id + status): araç kullanımdan müsaite geçince
-    // (veya tersi) renk/etiket değişeceğinden bitmap yeniden üretilmelidir.
-    fun iconIdOf(v: VehicleUi) = "veh-${v.id}-${v.status}"
+    // İkon kimliği içeriğe göre imzalanır (id + status + recommended): araç kullanımdan müsaite geçince
+    // (veya tersi) veya önerilirse bitmap yeniden üretilmelidir.
+    fun iconIdOf(v: VehicleUi) = "veh-${v.id}-${v.status}-${v.id in recommendedVehicleIds}"
 
     val currentIds = vehicles.mapTo(mutableSetOf()) { iconIdOf(it) }
     // Artık listede olmayan (veya durumu değişen) araçların ikonlarını stilden kaldır.
@@ -393,13 +401,15 @@ private fun updateVehicles(
 
     val features = vehicles.map { vehicle ->
         val available = VehicleMarkers.isAvailable(vehicle.status)
+        val isRecommended = vehicle.id in recommendedVehicleIds
         val iconId = iconIdOf(vehicle)
         if (addedIconIds.add(iconId)) {
+            val baseColor = VehicleMarkers.colorFor(vehicle.segment, vehicle.type, vehicle.status)
             val bitmap = VehicleMarkers.build(
                 context = context,
                 label = VehicleMarkers.labelFor(vehicle.status, vehicle.pricePerDay),
-                backgroundColor = VehicleMarkers.colorFor(vehicle.segment, vehicle.type, vehicle.status),
-                glow = available,
+                backgroundColor = baseColor,
+                glow = available || isRecommended,
             )
             style.addImage(iconId, bitmap)
         }
