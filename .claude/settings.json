@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST \"https://rencarv2.halitkalayci.com/auth/register\" -H \"Content-Type: application/json\" -d '{\"email\":\"probe.zz9x@example.com\",\"password\":\"Sifre123!\",\"fullName\":\"Probe Test\",\"phone\":\"+905550000000\"}')",
-      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST \"https://rencarv2.halitkalayci.com/auth/register\" -H \"Content-Type: application/json\" -d '{\"email\":\"customer@rencar.com\",\"password\":\"Sifre123!\",\"fullName\":\"Probe Test\",\"phone\":\"+905321119988\"}')"
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST \"https://rencarv2.halitkalayci.com/auth/register\" -H \"Content-Type: application/json\" -d '{\"email\":\"customer@rencar.com\",\"password\":\"Sifre123!\",\"fullName\":\"Probe Test\",\"phone\":\"+905321119988\"}')",
+      "Bash(./gradlew :app:compileDebugKotlin -Dorg.gradle.java.installations.auto-detect=false -Dorg.gradle.java.home=\"C:/Program Files/Android/Android Studio/jbr\" -q)",
+      "Bash(./gradlew :app:assembleDebug -Dorg.gradle.java.installations.auto-detect=false -Dorg.gradle.java.home=\"C:/Program Files/Android/Android Studio/jbr\" -q)"
     ]
   }
 }
