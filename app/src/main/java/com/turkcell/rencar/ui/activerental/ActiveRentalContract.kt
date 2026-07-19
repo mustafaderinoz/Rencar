@@ -79,4 +79,7 @@ sealed interface ActiveRentalIntent {
      * simülasyonu (poll + sayaç + socket) başlatır; sonraki basışlar yalnız görsel toggle'dır.
      */
     data object LockToggle : ActiveRentalIntent
+
+    /** Üst baştaki geri butonu — navigasyon Screen katmanında ele alınır (§4.5/§4.6). */
+    data object BackClicked : ActiveRentalIntent
 }

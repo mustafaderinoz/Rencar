@@ -12,7 +12,7 @@ import com.turkcell.rencar.data.model.VehiclePoint
 import com.turkcell.rencar.data.remote.api.RentalApi
 import com.turkcell.rencar.data.remote.dto.CreateRentalRequest
 import com.turkcell.rencar.data.remote.socket.RideLocationClient
-import com.turkcell.rencar.data.util.ImageCompressor
+import com.turkcell.rencar.data.util.toImagePart
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -21,14 +21,12 @@ import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.asRequestBody
 
 /**
  * Kiralama + araç fotoğrafı iş akışı (karar: decisions.md → data + repository).
  * ViewModel → Repository → RentalApi. Fotoğraflar yüklemeden önce 5MB altına sıkıştırılır
- * ([ImageCompressor]); hata yönetimi Result ile çağırana taşınır (mesaj eşlemesi ViewModel'de).
+ * (ortak [toImagePart]); hata yönetimi Result ile çağırana taşınır (mesaj eşlemesi ViewModel'de).
  */
 @Singleton
 class RentalRepository @Inject constructor(
@@ -123,16 +121,6 @@ class RentalRepository @Inject constructor(
     suspend fun cancelRental(rentalId: String): Result<Unit> = runCatching {
         rentalApi.cancel(rentalId)
         Unit
-    }
-
-    /** Dosyayı sıkıştırıp "field" adıyla JPEG multipart parçasına dönüştürür. */
-    private fun File.toImagePart(field: String, uploadName: String): MultipartBody.Part {
-        val compressed = ImageCompressor.compressForUpload(
-            source = this,
-            target = File(parentFile, uploadName),
-        )
-        val body = compressed.asRequestBody("image/jpeg".toMediaType())
-        return MultipartBody.Part.createFormData(field, compressed.name, body)
     }
 
     /**

@@ -134,22 +134,24 @@ fun RentalPhotosScreen(
 
     RentalPhotosScreen(
         uiState = uiState,
-        onBack = onNavigateBack,
+        // Kamera tetikleyicisi (Android API) §4.5 istisnasıdır: sonuç PhotoCaptured intent'iyle VM'e
+        // döner; buradaki callback yalnız launcher'ı başlatır (state değiştirmez).
         onCapture = ::onCaptureRequested,
-        onRetry = { viewModel.onIntent(RentalPhotosIntent.Retry) },
-        // "Kiralamayı Başlat" → POST /rentals/{id}/start; başarıda started bayrağı ile Home'a geçilir.
-        onStartClicked = { viewModel.onIntent(RentalPhotosIntent.StartClicked) },
+        onIntent = { intent ->
+            when (intent) {
+                RentalPhotosIntent.BackClicked -> onNavigateBack()
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 
-// ── Stateless gövde (§4.5): üstte başlık, ortada 2×2 yön ızgarası, altta uyarı + başlat ──
+// ── Stateless gövde (§4.5): uiState + onIntent (+ kamera tetikleyici istisnası) ──
 @Composable
 private fun RentalPhotosScreen(
     uiState: RentalPhotosUiState,
-    onBack: () -> Unit,
     onCapture: (PhotoSide) -> Unit,
-    onRetry: () -> Unit,
-    onStartClicked: () -> Unit,
+    onIntent: (RentalPhotosIntent) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -157,21 +159,21 @@ private fun RentalPhotosScreen(
             .background(MaterialTheme.colorScheme.surface)
             .systemBarsPadding(),
     ) {
-        TopBar(onBack = onBack)
+        TopBar(onBack = { onIntent(RentalPhotosIntent.BackClicked) })
 
         when {
             uiState.isCreating -> LoadingState(Modifier.weight(1f))
             uiState.createError != null && uiState.rentalId == null ->
                 ErrorState(
                     message = uiState.createError,
-                    onRetry = onRetry,
+                    onRetry = { onIntent(RentalPhotosIntent.Retry) },
                     modifier = Modifier.weight(1f),
                 )
 
             else -> Content(
                 uiState = uiState,
                 onCapture = onCapture,
-                onStartClicked = onStartClicked,
+                onStartClicked = { onIntent(RentalPhotosIntent.StartClicked) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -547,7 +549,7 @@ private val PreviewState = RentalPhotosUiState(
 @Composable
 private fun RentalPhotosLightPreview() {
     RenCarTheme(darkTheme = false) {
-        RentalPhotosScreen(uiState = PreviewState, onBack = {}, onCapture = {}, onRetry = {}, onStartClicked = {})
+        RentalPhotosScreen(uiState = PreviewState, onCapture = {}, onIntent = {})
     }
 }
 
@@ -561,10 +563,8 @@ private fun RentalPhotosDarkPreview() {
                 uploadedCount = 4,
                 photosComplete = true,
             ),
-            onBack = {},
             onCapture = {},
-            onRetry = {},
-            onStartClicked = {},
+            onIntent = {},
         )
     }
 }

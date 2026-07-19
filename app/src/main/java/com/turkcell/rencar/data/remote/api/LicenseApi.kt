@@ -12,14 +12,16 @@ import retrofit2.http.Part
 interface LicenseApi {
 
     /**
-     * Ehliyet ön + arka yüz fotoğraflarını yükler (multipart/form-data).
-     * UploadLicenseDto alanları: "front", "back". Auth zorunlu (AuthInterceptor Bearer ekler).
+     * Ehliyet ön + arka yüz fotoğrafları + yüz doğrulama selfie'sini yükler (multipart/form-data).
+     * UploadLicenseDto alanları: "front", "back", "selfie" (üçü de zorunlu — D5, yeni başvurular).
+     * Auth zorunlu (AuthInterceptor Bearer ekler).
      */
     @Multipart
     @POST("license/upload")
     suspend fun upload(
         @Part front: MultipartBody.Part,
         @Part back: MultipartBody.Part,
+        @Part selfie: MultipartBody.Part,
     ): LicenseResponse
 
     /** Mevcut kullanıcının ehliyet durumunu döner. Auth zorunlu (AuthInterceptor Bearer ekler). */

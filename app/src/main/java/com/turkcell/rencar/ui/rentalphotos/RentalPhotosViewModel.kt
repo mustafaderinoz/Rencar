@@ -66,6 +66,8 @@ class RentalPhotosViewModel @Inject constructor(
             RentalPhotosIntent.Retry -> createRental()
             is RentalPhotosIntent.PhotoCaptured -> uploadPhoto(intent.side, intent.path)
             RentalPhotosIntent.StartClicked -> startRental()
+            // Navigasyon Screen katmanında ele alınır (§4.6).
+            RentalPhotosIntent.BackClicked -> Unit
         }
     }
 

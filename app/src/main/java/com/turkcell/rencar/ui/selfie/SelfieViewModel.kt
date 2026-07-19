@@ -49,6 +49,19 @@ class SelfieViewModel @Inject constructor(
 
             is SelfieIntent.FaceStatusChanged -> onFaceStatus(intent.status)
 
+            is SelfieIntent.SelfieCaptured -> onSelfieCaptured(intent.path)
+
+            SelfieIntent.SelfieCaptureFailed ->
+                _uiState.update {
+                    it.copy(
+                        isUploading = false,
+                        captureRequested = false,
+                        holdProgress = 0f,
+                        faceStatus = FaceStatus.NoFace,
+                        errorMessage = "Selfie çekilemedi. Lütfen tekrar deneyin.",
+                    )
+                }
+
             SelfieIntent.RetryClicked -> {
                 holdJob?.cancel()
                 holdJob = null
@@ -56,6 +69,7 @@ class SelfieViewModel @Inject constructor(
                     it.copy(
                         faceStatus = FaceStatus.NoFace,
                         holdProgress = 0f,
+                        captureRequested = false,
                         errorMessage = null,
                         isUploading = false,
                     )
@@ -85,22 +99,28 @@ class SelfieViewModel @Inject constructor(
         }
     }
 
-    /** Yüz ortalı kaldığı sürece ilerlemeyi doldurur; tamamlanınca yüklemeyi tetikler. */
+    /** Yüz ortalı kaldığı sürece ilerlemeyi doldurur; tamamlanınca selfie çekimini tetikler. */
     private fun startHold() {
         holdJob = viewModelScope.launch {
             for (step in 1..HOLD_STEPS) {
                 delay(STEP_MS)
                 _uiState.update { it.copy(holdProgress = step.toFloat() / HOLD_STEPS) }
             }
-            upload()
+            // Yüz yeterince ortalı kaldı → ekran katmanı ön kameradan selfie karesini çeksin.
+            // isUploading true: "Doğrulanıyor…" gösterilir ve sonraki kareler değerlendirilmez.
+            _uiState.update { it.copy(isUploading = true, captureRequested = true, errorMessage = null) }
         }
     }
 
-    private fun upload() {
-        if (_uiState.value.isUploading) return
-        _uiState.update { it.copy(isUploading = true, errorMessage = null) }
+    /** Selfie karesi çekildi → ehliyet ön+arka + selfie'yi yükle. */
+    private fun onSelfieCaptured(path: String) {
+        _uiState.update { it.copy(captureRequested = false) }
         viewModelScope.launch {
-            licenseRepository.upload(front = File(frontPath), back = File(backPath))
+            licenseRepository.upload(
+                front = File(frontPath),
+                back = File(backPath),
+                selfie = File(path),
+            )
                 .onSuccess {
                     _uiState.update { it.copy(isUploading = false, uploaded = true) }
                 }

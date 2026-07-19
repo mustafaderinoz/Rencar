@@ -178,4 +178,10 @@ sealed interface PaymentIntent {
     data class AddCardYearChanged(val value: String) : PaymentIntent
     /** Pop-up "Ekle" → POST /cards; başarıda liste tazelenir, yeni kart seçilir. */
     data object SubmitAddCard : PaymentIntent
+
+    // ── Navigasyon (Screen katmanında ele alınır, §4.5/§4.6) ──
+    /** Üst baştaki geri butonu. */
+    data object BackClicked : PaymentIntent
+    /** Ödeme başarılı ekranındaki "Bitti" → Home'a döner. */
+    data object DoneClicked : PaymentIntent
 }

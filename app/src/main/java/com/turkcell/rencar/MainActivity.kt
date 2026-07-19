@@ -15,7 +15,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             RenCarTheme {
-                // Onboarding → Login → OTP navigasyon grafiği (bkz. RencarNavHost).
+                // Splash başlangıçlı uygulama navigasyon grafiği (bkz. RencarNavHost).
                 RencarNavHost()
             }
         }

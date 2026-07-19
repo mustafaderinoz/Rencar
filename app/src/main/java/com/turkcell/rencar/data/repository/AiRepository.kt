@@ -2,38 +2,27 @@ package com.turkcell.rencar.data.repository
 
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
-import com.google.ai.client.generativeai.type.generationConfig
-import com.turkcell.rencar.BuildConfig
+import com.turkcell.rencar.data.mapper.parseRecommendedIds
+import com.turkcell.rencar.data.mapper.toPromptLine
 import com.turkcell.rencar.data.model.VehicleUi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Doğal dil sorgusuna göre araç önerisi (Gemini). Kütüphane DI ardındadır: [model] enjekte edilir
+ * (bkz. [com.turkcell.rencar.di.AiModule]); araç betimi ve yanıt ayrıştırma mapper katmanındadır
+ * (bkz. `data/mapper/AiMapper`). Repository yalnızca eşleştirme kurallarını (prompt) ve model
+ * çağrısını orkestre eder — RentalRepository'nin tarih/iş kuralını kapsüllemesiyle aynı desen.
+ */
 @Singleton
-class AiRepository @Inject constructor() {
-
-    private val model = GenerativeModel(
-        modelName = "gemini-3.5-flash",
-        apiKey = BuildConfig.GEMINI_API_KEY,
-        generationConfig = generationConfig {
-            responseMimeType = "application/json"
-        }
-    )
-
-    private val json = Json { ignoreUnknownKeys = true }
+class AiRepository @Inject constructor(
+    private val model: GenerativeModel,
+) {
 
     suspend fun recommendVehicles(query: String, vehicles: List<VehicleUi>): Result<List<String>> = runCatching {
         if (query.isBlank()) return@runCatching emptyList()
 
-        // segment bilgisi eksikti — eklendi, model artık ECONOMY/COMFORT/SUV ayrımını görebiliyor.
-        val vehiclesJson = vehicles.joinToString(separator = "\n") { v ->
-            "ID: ${v.id} | Marka-Model: ${v.brand} ${v.model} | Kasa Tipi: ${v.type} | " +
-                    "Fiyat Segmenti: ${v.segment} | Günlük Fiyat: ${v.pricePerDay} TL | " +
-                    "Menzil: ${v.rangeKm} Km | " +
-                    "Koltuk: ${v.seats ?: 5} | Vites: ${v.transmission ?: "Bilinmiyor"}"
-        }
+        val vehiclesJson = vehicles.joinToString(separator = "\n") { it.toPromptLine() }
 
         val prompt = """
             Sen bir araç kiralama asistanısın. Kullanıcının doğal dildeki isteğine göre,
@@ -68,8 +57,6 @@ class AiRepository @Inject constructor() {
         """.trimIndent()
 
         val response = model.generateContent(content { text(prompt) })
-        val responseText = response.text ?: "[]"
-
-        json.parseToJsonElement(responseText).jsonArray.map { it.jsonPrimitive.content }
+        parseRecommendedIds(response.text ?: "[]")
     }
 }

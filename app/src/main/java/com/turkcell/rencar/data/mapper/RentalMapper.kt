@@ -12,7 +12,6 @@ import com.turkcell.rencar.data.remote.dto.RentalPhotosState
 import com.turkcell.rencar.data.remote.dto.RentalResponse
 import com.turkcell.rencar.data.remote.dto.RentalStatsResponse
 import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -114,17 +113,4 @@ private fun formatIsoDateTime(iso: String): String? {
 private fun formatTripDate(iso: String?): String {
     val parsed = iso?.let { parseIso(it) } ?: return ""
     return SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.forLanguageTag("tr")).format(parsed)
-}
-
-/** ISO-8601 → [Date]; 'X' deseni ofseti ("Z" veya "+03:00") çözer. Çözülemezse null. */
-private fun parseIso(iso: String): Date? {
-    val patterns = listOf(
-        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-    )
-    for (pattern in patterns) {
-        val parsed = runCatching { SimpleDateFormat(pattern, Locale.US).parse(iso) }.getOrNull()
-        if (parsed != null) return parsed
-    }
-    return null
 }

@@ -86,4 +86,7 @@ sealed interface ReservationIntent {
 
     /** "Rezervasyonu Tamamla" → POST /reservations. */
     data object ReserveClicked : ReservationIntent
+
+    /** Üst baştaki geri butonu — navigasyon Screen katmanında ele alınır (§4.5/§4.6). */
+    data object BackClicked : ReservationIntent
 }

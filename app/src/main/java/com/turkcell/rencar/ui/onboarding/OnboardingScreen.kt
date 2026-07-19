@@ -60,7 +60,6 @@ fun OnboardingScreen(
             when (intent) {
                 // "Hemen Başla" ve "Giriş yap" mevcut tek giriş ekranına (Login) yönlendirir.
                 OnboardingIntent.StartClicked, OnboardingIntent.LoginClicked -> onNavigateToLogin()
-                else -> viewModel.onIntent(intent)
             }
         },
     )
@@ -109,10 +108,7 @@ private fun OnboardingScreen(
             Spacer(Modifier.weight(1f))
 
             // ── Alt bölge: sayfa göstergesi + aksiyonlar ──
-            PageIndicator(
-                currentPage = uiState.currentPage,
-                pageCount = uiState.pageCount,
-            )
+            PageIndicator(pageCount = uiState.pageCount)
 
             Spacer(Modifier.height(28.dp))
 
@@ -188,7 +184,6 @@ private fun RencarLogo() {
 // ── 3 noktalı sayfa göstergesi (aktif = mavi pill) ──
 @Composable
 private fun PageIndicator(
-    currentPage: Int,
     pageCount: Int,
 ) {
     Row(
@@ -196,7 +191,8 @@ private fun PageIndicator(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(pageCount) { index ->
-            val active = index == currentPage
+            // Pager yok (tek statik tanıtım ekranı): yalnız ilk nokta aktif.
+            val active = index == 0
             Box(
                 modifier = Modifier
                     .height(8.dp)

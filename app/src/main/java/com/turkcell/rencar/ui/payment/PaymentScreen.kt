@@ -73,9 +73,13 @@ fun PaymentScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     PaymentScreen(
         uiState = uiState,
-        onBack = onNavigateBack,
-        onDone = onNavigateToHome,
-        onIntent = viewModel::onIntent,
+        onIntent = { intent ->
+            when (intent) {
+                PaymentIntent.BackClicked -> onNavigateBack()
+                PaymentIntent.DoneClicked -> onNavigateToHome()
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 
@@ -83,8 +87,6 @@ fun PaymentScreen(
 @Composable
 private fun PaymentScreen(
     uiState: PaymentUiState,
-    onBack: () -> Unit,
-    onDone: () -> Unit,
     onIntent: (PaymentIntent) -> Unit,
 ) {
     Column(
@@ -93,7 +95,7 @@ private fun PaymentScreen(
             .background(MaterialTheme.colorScheme.surface)
             .systemBarsPadding(),
     ) {
-        TopBar(onBack = onBack)
+        TopBar(onBack = { onIntent(PaymentIntent.BackClicked) })
 
         when {
             uiState.isLoading ->
@@ -109,7 +111,7 @@ private fun PaymentScreen(
             uiState.isPaid ->
                 PaidState(
                     result = uiState.result!!,
-                    onDone = onDone,
+                    onDone = { onIntent(PaymentIntent.DoneClicked) },
                     modifier = Modifier.weight(1f),
                 )
 
@@ -1305,7 +1307,7 @@ private fun PaymentCardLightPreview() {
                 walletBalance = 4904.0,
                 discountCode = "İLKSÜRÜŞ",
             ),
-            onBack = {}, onDone = {}, onIntent = {},
+            onIntent = {},
         )
     }
 }
@@ -1321,7 +1323,7 @@ private fun PaymentWalletDarkPreview() {
                 method = PaymentMethod.WALLET,
                 walletBalance = 4904.0,
             ),
-            onBack = {}, onDone = {}, onIntent = {},
+            onIntent = {},
         )
     }
 }
@@ -1337,7 +1339,7 @@ private fun PaymentIyzicoLightPreview() {
                 method = PaymentMethod.IYZICO,
                 walletBalance = 4904.0,
             ),
-            onBack = {}, onDone = {}, onIntent = {},
+            onIntent = {},
         )
     }
 }
@@ -1358,7 +1360,7 @@ private fun PaymentAddCardPreview() {
                 addCardMonth = "12",
                 addCardYear = "2028",
             ),
-            onBack = {}, onDone = {}, onIntent = {},
+            onIntent = {},
         )
     }
 }
@@ -1380,7 +1382,7 @@ private fun PaymentPaidPreview() {
                     cardLast4 = "4291",
                 ),
             ),
-            onBack = {}, onDone = {}, onIntent = {},
+            onIntent = {},
         )
     }
 }

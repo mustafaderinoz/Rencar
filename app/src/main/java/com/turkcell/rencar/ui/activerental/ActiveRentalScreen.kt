@@ -78,8 +78,12 @@ fun ActiveRentalScreen(
 
     ActiveRentalScreen(
         uiState = uiState,
-        onBack = onNavigateBack,
-        onIntent = viewModel::onIntent,
+        onIntent = { intent ->
+            when (intent) {
+                ActiveRentalIntent.BackClicked -> onNavigateBack()
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 
@@ -87,7 +91,6 @@ fun ActiveRentalScreen(
 @Composable
 private fun ActiveRentalScreen(
     uiState: ActiveRentalUiState,
-    onBack: () -> Unit,
     onIntent: (ActiveRentalIntent) -> Unit,
 ) {
     Column(
@@ -96,7 +99,7 @@ private fun ActiveRentalScreen(
             .background(MaterialTheme.colorScheme.surface)
             .systemBarsPadding(),
     ) {
-        TopBar(onBack = onBack)
+        TopBar(onBack = { onIntent(ActiveRentalIntent.BackClicked) })
 
         val firstLoad = uiState.vehicleTitle.isEmpty()
         when {
@@ -571,7 +574,7 @@ private val PreviewState = ActiveRentalUiState(
 @Composable
 private fun ActiveRentalLightPreview() {
     RenCarTheme(darkTheme = false) {
-        ActiveRentalScreen(uiState = PreviewState, onBack = {}, onIntent = {})
+        ActiveRentalScreen(uiState = PreviewState, onIntent = {})
     }
 }
 
@@ -579,6 +582,6 @@ private fun ActiveRentalLightPreview() {
 @Composable
 private fun ActiveRentalDarkPreview() {
     RenCarTheme(darkTheme = true) {
-        ActiveRentalScreen(uiState = PreviewState, onBack = {}, onIntent = {})
+        ActiveRentalScreen(uiState = PreviewState, onIntent = {})
     }
 }

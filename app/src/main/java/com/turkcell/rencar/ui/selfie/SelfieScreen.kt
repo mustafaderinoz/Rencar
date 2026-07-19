@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -73,6 +75,7 @@ import com.turkcell.rencar.ui.icons.RencarIcons
 import com.turkcell.rencar.ui.theme.LightPrimary
 import com.turkcell.rencar.ui.theme.LightSuccess
 import com.turkcell.rencar.ui.theme.RenCarTheme
+import java.io.File
 import java.util.concurrent.Executors
 
 /** Marka mavisi — tema-bağımsız (bkz. Login/OTP). */
@@ -107,27 +110,26 @@ fun SelfieScreen(
 
     SelfieScreen(
         uiState = uiState,
-        onFaceStatus = { viewModel.onIntent(SelfieIntent.FaceStatusChanged(it)) },
-        onBack = onNavigateBack,
-        onRetry = { viewModel.onIntent(SelfieIntent.RetryClicked) },
-        onDone = {
-            viewModel.onIntent(SelfieIntent.DoneClicked)
-            // Yükleme başarılı → ehliyet artık UNDER_REVIEW; kullanıcı bekleme ekranına kilitlenir.
-            onNavigateToPending()
-        },
+        // İzin launcher tetikleyicisi (Android API) §4.5 istisnasıdır; sonuç PermissionResult
+        // intent'iyle döner (yukarıdaki requestCamera).
         onGrantPermission = { requestCamera.launch(Manifest.permission.CAMERA) },
+        onIntent = { intent ->
+            when (intent) {
+                SelfieIntent.BackClicked -> onNavigateBack()
+                // Yükleme başarılı → ehliyet UNDER_REVIEW; kullanıcı bekleme ekranına kilitlenir.
+                SelfieIntent.DoneClicked -> onNavigateToPending()
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 
-// ── Stateless gövde (§4.5) ──
+// ── Stateless gövde (§4.5): uiState + onIntent (+ izin tetikleyici istisnası) ──
 @Composable
 private fun SelfieScreen(
     uiState: SelfieUiState,
-    onFaceStatus: (FaceStatus) -> Unit,
-    onBack: () -> Unit,
-    onRetry: () -> Unit,
-    onDone: () -> Unit,
     onGrantPermission: () -> Unit,
+    onIntent: (SelfieIntent) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -135,17 +137,22 @@ private fun SelfieScreen(
             .background(Color.Black),
     ) {
         when {
-            uiState.uploaded -> ApprovalContent(onDone = onDone)
+            uiState.uploaded -> ApprovalContent(onDone = { onIntent(SelfieIntent.DoneClicked) })
 
             uiState.permissionGranted -> {
                 CameraPreview(
-                    onFaceStatus = onFaceStatus,
+                    onFaceStatus = { onIntent(SelfieIntent.FaceStatusChanged(it)) },
+                    // Çekim tetiği (Android-API/leaf istisnası §4.5): state ile istenir, sonuç
+                    // SelfieCaptured/SelfieCaptureFailed intent'iyle VM'e döner.
+                    captureRequested = uiState.captureRequested,
+                    onSelfieCaptured = { path -> onIntent(SelfieIntent.SelfieCaptured(path)) },
+                    onCaptureError = { onIntent(SelfieIntent.SelfieCaptureFailed) },
                     modifier = Modifier.fillMaxSize(),
                 )
                 ScanOverlay(uiState = uiState, modifier = Modifier.fillMaxSize())
                 ScanStatusBar(
                     uiState = uiState,
-                    onRetry = onRetry,
+                    onRetry = { onIntent(SelfieIntent.RetryClicked) },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .systemBarsPadding()
@@ -162,7 +169,7 @@ private fun SelfieScreen(
         // Üst bar (Onay ekranında gizli — başlığı overlay kendi taşır).
         if (!uiState.uploaded) {
             TopBar(
-                onBack = onBack,
+                onBack = { onIntent(SelfieIntent.BackClicked) },
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .systemBarsPadding()
@@ -172,16 +179,28 @@ private fun SelfieScreen(
     }
 }
 
-// ── CameraX ön kamera önizlemesi + yüz analizi ──
+// ── CameraX ön kamera önizlemesi + yüz analizi + selfie çekimi ──
 @Composable
 private fun CameraPreview(
     onFaceStatus: (FaceStatus) -> Unit,
+    captureRequested: Boolean,
+    onSelfieCaptured: (String) -> Unit,
+    onCaptureError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
     val latestOnStatus by rememberUpdatedState(onFaceStatus)
+    val latestOnCaptured by rememberUpdatedState(onSelfieCaptured)
+    val latestOnError by rememberUpdatedState(onCaptureError)
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    // Yüz ortalama kapısı geçilince tetiklenen fotoğraf çekim use-case'i (Preview/Analysis ile bağlanır).
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .build()
+    }
 
     AndroidView(
         modifier = modifier,
@@ -209,12 +228,35 @@ private fun CameraPreview(
                         CameraSelector.DEFAULT_FRONT_CAMERA,
                         preview,
                         analysis,
+                        imageCapture,
                     )
                 }
             }, ContextCompat.getMainExecutor(ctx))
             previewView
         },
     )
+
+    // Yüz kapısı geçilince (captureRequested=true) ön kameradan tek kare çek; ehliyet fotoğraflarının
+    // yanına "licenses/selfie.jpg" olarak yaz (yükleme öncesi ImageCompressor sıkıştırır + EXIF döndürür).
+    LaunchedEffect(captureRequested) {
+        if (!captureRequested) return@LaunchedEffect
+        val dir = File(context.filesDir, "licenses").apply { mkdirs() }
+        val file = File(dir, "selfie.jpg")
+        val options = ImageCapture.OutputFileOptions.Builder(file).build()
+        imageCapture.takePicture(
+            options,
+            ContextCompat.getMainExecutor(context),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    latestOnCaptured(file.absolutePath)
+                }
+
+                override fun onError(exc: ImageCaptureException) {
+                    latestOnError()
+                }
+            },
+        )
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -514,11 +556,8 @@ private fun SelfiePermissionPreview() {
     RenCarTheme(darkTheme = true) {
         SelfieScreen(
             uiState = SelfieUiState(permissionGranted = false, permissionRequested = true),
-            onFaceStatus = {},
-            onBack = {},
-            onRetry = {},
-            onDone = {},
             onGrantPermission = {},
+            onIntent = {},
         )
     }
 }
@@ -529,11 +568,8 @@ private fun SelfieApprovalPreview() {
     RenCarTheme(darkTheme = false) {
         SelfieScreen(
             uiState = SelfieUiState(uploaded = true),
-            onFaceStatus = {},
-            onBack = {},
-            onRetry = {},
-            onDone = {},
             onGrantPermission = {},
+            onIntent = {},
         )
     }
 }

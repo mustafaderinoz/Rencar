@@ -85,9 +85,8 @@ class RegisterViewModel @Inject constructor(
 
         // Her denemede alan hataları baştan hesaplanır: aksi halde önceki denemeden kalan sunucu
         // hatası (ör. "Bu e-posta zaten kayıtlı") istek uçarken ekranda asılı kalırdı.
-        val validated = state.validate()
-        _uiState.value = validated
-        if (validated.hasFieldError) return
+        _uiState.update { it.validate() }
+        if (_uiState.value.hasFieldError) return
 
         _uiState.update { it.copy(isLoading = true, formError = null) }
         viewModelScope.launch {

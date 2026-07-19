@@ -1,7 +1,7 @@
 package com.turkcell.rencar.ui.map
 
+import com.turkcell.rencar.data.model.GeoPoint
 import com.turkcell.rencar.data.model.VehicleUi
-import org.maplibre.android.geometry.LatLng
 
 /**
  * 04·Harita — saf UI durumu (§4.2).
@@ -12,7 +12,7 @@ import org.maplibre.android.geometry.LatLng
  */
 data class MapUiState(
     /** Anlık kullanıcı konumu; harita üzerindeki mavi noktayı besler (null → nokta gizli). */
-    val myLocation: LatLng? = null,
+    val myLocation: GeoPoint? = null,
     /** Konum izni verildi mi. Konum güncellemeleri yalnızca bu true iken başlar. */
     val hasLocationPermission: Boolean = false,
     /** Kullanıcı izni açıkça reddetti mi (sistem diyaloğunda). */
@@ -66,7 +66,7 @@ sealed interface MapIntent {
     data class PermissionResult(val granted: Boolean) : MapIntent
 
     /** Fused location'dan gelen taze/güncel konum. */
-    data class LocationChanged(val location: LatLng) : MapIntent
+    data class LocationChanged(val location: GeoPoint) : MapIntent
 
     /** İlk konuma tek seferlik kamera zoom'u tamamlandı (tekrar zoom'u önler). */
     data object CenteredOnUser : MapIntent

@@ -5,9 +5,9 @@ import android.net.Uri
 /**
  * Uygulamanın navigasyon rota (route) sabitleri.
  *
- * Mevcut ekranlar tek yönlü akışı oluşturur: Onboarding → Login → OTP. Her ekran tek
- * bir string route ile temsil edilir; yeni ekranlar (ör. register/home) eklendikçe
- * buraya genişletilir (§2.2: var olmayan ekran uydurulmaz).
+ * Grafik Splash ile başlar (oturum geri yükleme) ve oradan onboarding/giriş/doğrulama, harita,
+ * rezervasyon, kiralama, ödeme ve cüzdan ekranlarına dallanır. Her ekran tek bir string route ile
+ * temsil edilir; yeni ekranlar eklendikçe buraya genişletilir (§2.2: var olmayan ekran uydurulmaz).
  */
 object RencarDestinations {
 

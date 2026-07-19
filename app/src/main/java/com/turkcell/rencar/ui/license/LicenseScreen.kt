@@ -158,21 +158,26 @@ fun LicenseScreen(
 
     LicenseScreen(
         uiState = uiState,
-        onBack = onNavigateBack,
+        // Kamera tetikleyicileri (Android API) §4.5 istisnasıdır: sonuç FrontCaptured/BackCaptured
+        // intent'iyle VM'e döner; buradaki callback yalnız launcher'ı başlatır (state değiştirmez).
         onCaptureFront = { onCaptureRequested(LicenseSide.FRONT) },
         onCaptureBack = { onCaptureRequested(LicenseSide.BACK) },
-        onContinue = { viewModel.onIntent(LicenseIntent.ContinueClicked) },
+        onIntent = { intent ->
+            when (intent) {
+                LicenseIntent.BackClicked -> onNavigateBack()
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 
-// ── Stateless gövde (§4.5) ──
+// ── Stateless gövde (§4.5): uiState + onIntent (+ kamera tetikleyici istisnaları) ──
 @Composable
 private fun LicenseScreen(
     uiState: LicenseUiState,
-    onBack: () -> Unit,
     onCaptureFront: () -> Unit,
     onCaptureBack: () -> Unit,
-    onContinue: () -> Unit,
+    onIntent: (LicenseIntent) -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -189,7 +194,7 @@ private fun LicenseScreen(
 
             // ── Başlık satırı: geri + başlık/alt başlık ──
             Row(verticalAlignment = Alignment.CenterVertically) {
-                BackButton(onClick = onBack)
+                BackButton(onClick = { onIntent(LicenseIntent.BackClicked) })
                 Spacer(Modifier.width(14.dp))
                 Column {
                     Text(
@@ -249,7 +254,7 @@ private fun LicenseScreen(
 
             // ── "Devam Et" — mavi buton ──
             Button(
-                onClick = onContinue,
+                onClick = { onIntent(LicenseIntent.ContinueClicked) },
                 enabled = uiState.canContinue,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -465,10 +470,9 @@ private fun LicenseScreenLightPreview() {
     RenCarTheme(darkTheme = false) {
         LicenseScreen(
             uiState = LicenseUiState(),
-            onBack = {},
             onCaptureFront = {},
             onCaptureBack = {},
-            onContinue = {},
+            onIntent = {},
         )
     }
 }
@@ -479,10 +483,9 @@ private fun LicenseScreenDarkPreview() {
     RenCarTheme(darkTheme = true) {
         LicenseScreen(
             uiState = LicenseUiState(frontPath = "/dev/null", canContinue = false),
-            onBack = {},
             onCaptureFront = {},
             onCaptureBack = {},
-            onContinue = {},
+            onIntent = {},
         )
     }
 }

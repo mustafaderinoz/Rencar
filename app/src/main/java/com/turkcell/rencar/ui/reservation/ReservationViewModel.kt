@@ -60,6 +60,8 @@ class ReservationViewModel @Inject constructor(
             ReservationIntent.TermsToggled ->
                 _uiState.update { it.copy(termsAccepted = !it.termsAccepted) }
             ReservationIntent.ReserveClicked -> reserve()
+            // Navigasyon Screen katmanında ele alınır (§4.6).
+            ReservationIntent.BackClicked -> Unit
         }
     }
 

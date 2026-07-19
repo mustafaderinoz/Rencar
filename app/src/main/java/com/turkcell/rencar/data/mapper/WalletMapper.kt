@@ -57,18 +57,6 @@ private fun relativeDateLabel(iso: String): String {
     }
 }
 
-private fun parseIso(iso: String): Date? {
-    val patterns = listOf(
-        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-    )
-    for (pattern in patterns) {
-        val parsed = runCatching { SimpleDateFormat(pattern, Locale.US).parse(iso) }.getOrNull()
-        if (parsed != null) return parsed
-    }
-    return null
-}
-
 /** [date] ile bugün arasındaki takvim-günü farkı (cihaz yerel saati): 0 = bugün, 1 = dün. */
 private fun daysAgo(date: Date): Int {
     fun Calendar.startOfDay() = apply {

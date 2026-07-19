@@ -66,6 +66,9 @@ class PaymentViewModel @Inject constructor(
             is PaymentIntent.AddCardYearChanged ->
                 _uiState.update { it.copy(addCardYear = intent.value.filter { c -> c.isDigit() }.take(4)) }
             PaymentIntent.SubmitAddCard -> submitAddCard()
+
+            // Navigasyon Screen katmanında ele alınır (§4.6).
+            PaymentIntent.BackClicked, PaymentIntent.DoneClicked -> Unit
         }
     }
 

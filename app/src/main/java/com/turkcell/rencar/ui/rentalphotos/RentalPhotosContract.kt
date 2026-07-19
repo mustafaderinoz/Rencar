@@ -78,4 +78,7 @@ sealed interface RentalPhotosIntent {
 
     /** "Kiralamayı Başlat" → POST /rentals/{id}/start (yolculuk ACTIVE olur). */
     data object StartClicked : RentalPhotosIntent
+
+    /** Üst baştaki geri butonu — navigasyon Screen katmanında ele alınır (§4.5/§4.6). */
+    data object BackClicked : RentalPhotosIntent
 }

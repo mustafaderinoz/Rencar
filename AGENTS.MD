@@ -64,7 +64,8 @@ Her özellik `ui/<feature>/` paketi altında, üç dosya halinde:
 ### 4.5) Ekran (Compose)
 
 - **Stateful sarmalayıcı**: `viewModel: <Feature>ViewModel = hiltViewModel()` alır, `collectAsStateWithLifecycle()` ile state'i toplar ve stateless gövdeyi besler.
-- **Stateless gövde**: yalnızca `uiState` + `onIntent: (<Feature>Intent) -> Unit` parametreleriyle çizer.
+- **Stateless gövde**: yalnızca `uiState` + `onIntent: (<Feature>Intent) -> Unit` parametreleriyle çizer. Geri dâhil tüm navigasyon ve durum değiştiren aksiyonlar `onIntent` üzerinden gider (ör. geri için `BackClicked` intent'i; navigasyonu sarmalayıcı yakalar).
+  - **İstisna (Android-API tetikleyicileri):** bir Android launcher'ını BAŞLATAN callback'ler — kamera çekimi (`onCapture`), izin isteme (`onGrantPermission`) gibi — ek parametre olarak geçirilebilir. Bunlar durumu değiştirmez; yalnız launcher'ı tetikler ve SONUÇ bir intent'le (`PhotoCaptured`, `PermissionResult` vb.) VM'e döner. Alt composable'ların kendi özel callback'leri (leaf) bu kuralın kapsamı dışındadır; kural üst stateless gövdeye uygulanır.
 - `@Preview`'lar stateless gövdeyi Hilt'siz, sabit `<Feature>UiState()` ile render eder.
 
 ### 4.6) Katman sınırı

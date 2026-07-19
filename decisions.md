@@ -229,13 +229,19 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 
 ### Kamera & Yüz Algılama (Ehliyet + Selfie doğrulama)
 
-- Seçim: **CameraX (1.4.2) + ML Kit Face Detection (16.1.7, bundled)**
+- Seçim: **CameraX (1.4.2) + ML Kit Face Detection (16.1.7, bundled). Yüz ML Kit ile ~1.2 sn ovalde ortalı kalınca ön kameradan bir selfie karesi `ImageCapture` ile çekilir ve ehliyet ön+arka ile birlikte `POST /license/upload`'a `selfie` part'ı olarak gönderilir.**
 
-- Son Güncelleme Tarihi: 09.07.2026
+- Son Güncelleme Tarihi: 19.07.2026 (ilk: 09.07.2026)
 
 - Alternatifler: **Camera2 API (düşük seviye)**, **ML Kit unbundled (Play Services)**
 
-- Sebep: Selfie ekranında canlı önizleme + gerçek zamanlı yüz ortalama; CameraX lifecycle-bağlı ve Compose (`PreviewView` + `AndroidView`) ile temiz. ML Kit bundled model offline çalışır (Play Services'e bağımlı değil). Selfie yalnızca client-side liveness kapısıdır; backend'e GÖNDERİLMEZ (`UploadLicenseDto` yalnız front+back alır).
+- Sebep: Selfie ekranında canlı önizleme + gerçek zamanlı yüz ortalama; CameraX lifecycle-bağlı ve Compose (`PreviewView` + `AndroidView`) ile temiz. ML Kit bundled model offline çalışır (Play Services'e bağımlı değil). ML Kit yüz ortalama yalnızca **client-side canlılık/hazır kapısıdır** (çekimi ne zaman tetikleyeceğini belirler); doğrulanan selfie görüntüsünün kendisi backend'e yüklenir.
+
+- **BUG düzeltmesi (19.07.2026) — "Fotoğraf geçersiz, ehliyet adımına dönüp tekrar çekin." (400):** Eski karar (09.07) "selfie backend'e GÖNDERİLMEZ; `UploadLicenseDto` yalnız front+back alır" diyordu. Backend **D5** ile selfie'yi zorunlu kıldı: `UploadLicenseDto.required = [front, back, selfie]` (17.07.2026'da canlı sunucudan tazelenen `openapi.json` ile doğrulandı — bkz. "Canlı Sunucudan Tazeleme"). İstemci hâlâ yalnız 2 dosya gönderdiğinden sunucu **her** yüklemede 400 dönüyordu; `SelfieViewModel` bunu genel "Fotoğraf geçersiz…" mesajına çeviriyordu (yüz aslında tanınıyordu — 400 ancak yüz ortalanıp yükleme tetiklendikten SONRA gelir). Selfie ekranı hiçbir kare çekmiyordu (yalnız `Preview` + `ImageAnalysis` bağlıydı). Düzeltme: `CameraPreview`'e `ImageCapture` use-case'i eklendi; hold dolunca `captureRequested` state'i ile çekim tetiklenir, kare `filesDir/licenses/selfie.jpg`'e yazılır ve sonuç `SelfieCaptured`/`SelfieCaptureFailed` intent'iyle döner (Android-API/leaf tetikleyici — §4.5). Selfie de front/back gibi ortak `toImagePart` ile 5MB altına sıkıştırılır.
+
+- **Yeni bağımlılık YOK.** `ImageCapture` mevcut `androidx.camera:camera-core`'un parçası (Preview/ImageAnalysis ile aynı artifact).
+
+- **Dokunulan dosyalar:** `data/remote/api/LicenseApi` (upload'a selfie part), `data/repository/LicenseRepository` (upload(front,back,selfie)), `ui/selfie/{SelfieContract,SelfieViewModel,SelfieScreen}` (captureRequested state + SelfieCaptured/SelfieCaptureFailed intent + ImageCapture bağlama/tetik).
 
 
 ### Ehliyet Görsel Kaynağı
@@ -483,3 +489,30 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** yeni `ui/rentals/{RentalsContract,RentalsViewModel,RentalsScreen}`; güncellenen `data/remote/dto/RentalDtos` (RentalResponse.startedAt/createdAt + RentalStatsResponse), `data/remote/api/RentalApi` (listMine + stats), `data/model/RentalUi` (RentalHistoryItemUi + RentalStatsUi), `data/mapper/RentalMapper` (toHistoryItem + stats toUi + tarih/km biçimleri), `data/repository/RentalRepository` (getMyRentals + getMonthlyStats), `ui/home/HomeScreen` (placeholder → RentalsScreen).
 
 - Not (18.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Uçtan uca cihazda DENENMEDİ (giriş yapmış CUSTOMER oturumu gerekir).
+
+---
+
+### AI Araç Önerisi (Gemini) — Doğal Dil Filtresi
+
+- Seçim: **Harita ekranındaki AI diyaloğu, kullanıcının doğal dildeki isteğini (`AiRecommendationDialog`) Google Gemini'ye (`com.google.ai.client.generativeai`) gönderir; model, haritadaki müsait araç listesinden EN UYGUN olanların ID'lerini bir JSON dizisi olarak döndürür; bu ID'ler haritada vurgulanır (`MapUiState.recommendedVehicleIds`).** Eşleştirme (lüks→COMFORT, arazi→SUV, bütçe filtresi vb.) tamamen istemci-prompt kurallarıyla yapılır — RenCar API'sinde doğal-dil/öneri ucu YOKTUR (§2.2 uydurmak yasak).
+
+- Son Güncelleme Tarihi: 19.07.2026 (özellik: `feature/gemini` merge'ü; katman hizalaması: 19.07.2026)
+
+- Alternatifler: **Sunucu tarafı öneri ucu** (API'de yok — §2.2), **istemci tarafı elle kural motoru** (doğal dili yorumlayamaz; segment/bütçe/kasa-tipi kombinasyonlarını serbest metinden çıkaramaz).
+
+- Sebep: Tasarımdaki "kendi cümlelerinle anlat, filtreleyelim" akışı. Model konum verisini bu bağlamda kullanmaz (araç konumu prompt'a girmez); yalnız fiyat/segment/tip/koltuk/vites kriterlerine bakar.
+
+- **Katman hizalaması (19.07.2026) — decisions.md "Katman Derinliği" + "Kütüphane" ile uyum:** Özellik `feature/gemini` ile eklendiğinde `AiRepository` SDK'yı gövdesinde kuruyor ve JSON yanıtını inline ayrıştırıyordu (diğer repository'lerin izlediği api/di + mapper disiplininin DIŞINDA). Hizalandı:
+  - **Kütüphane DI ardına alındı:** `GenerativeModel` artık `di/AiModule` içinde `@Provides @Singleton` ile sağlanır ve `AiRepository`'ye enjekte edilir (NetworkModule'ün OkHttp/Retrofit sağlaması gibi). Model yapılandırması tek noktada; repo sahte modelle test edilebilir.
+  - **Dönüşüm mapper katmanına alındı:** araç betimi (`VehicleUi.toPromptLine()`) ve yanıt ayrıştırma (`parseRecommendedIds`) `data/mapper/AiMapper`'a taşındı. Repository yalnızca eşleştirme kurallarını (prompt) ve model çağrısını orkestre eder — `RentalRepository`'nin tarih/`basketId` iş kuralını kapsüllemesiyle aynı desen (repo-içi iş kuralı bu projede kabul edilir; **+1 UseCase tier EKLENMEZ**, satır ~173).
+
+- **Yeni bağımlılık YOK.** Gemini SDK (`com.google.ai.client.generativeai`) ve `BuildConfig.GEMINI_API_KEY` zaten mevcut.
+
+- **Bilinen/kabul edilen sapmalar:**
+  - **Model adı `gemini-3.5-flash` korundu** — mevcut çalışan yapılandırma; §2.2 gereği "düzeltme" adına değiştirilmedi.
+  - **Dönüş tipi `Result<List<String>>` (ham ID listesi):** sonuç zaten bir ID kümesidir (`recommendedVehicleIds: Set<String>` olarak tüketilir); tiplenmiş bir sarmalayıcı model eklemek `AiRecommendationViewModel`'i de değiştirirdi ve değer katmazdı ("Minimum Değişiklik").
+  - **`AiRecommendation` ikinci bir Contract+ViewModel olarak `ui/map` altında yaşar:** diyalog kendi VM'ine sahiptir; sonuç `AiRecommendationDialog.onApply` → `MapIntent.SetAiRecommendations` ile MapVM'e döner. Diyaloğun stateless içeriği §4.5'e (`uiState`+`onIntent`) **hizalandı (19.07.2026):** aday araç listesi artık `Submit` payload'ı değil, `VehiclesProvided` intent'iyle VM state'ine akar (tek doğruluk kaynağı); kapatma `Dismiss` intent'iyle Screen katmanında ele alınır.
+
+- **Dokunulan/eklenen dosyalar:** yeni `di/AiModule`, `data/mapper/AiMapper`; güncellenen `data/repository/AiRepository` (GenerativeModel inject + mapper'a devir). `ui/map/AiRecommendation*` ve `MapViewModel`/`MapContract` bu adımda DEĞİŞMEDİ.
+
+- Not (19.07.2026): Katman hizalaması yapıldı; derleme doğrulaması kullanıcı ortamında alınacak.

@@ -84,6 +84,12 @@ fun AiRecommendationDialog(
         }
     }
 
+    // Harita ekranından gelen aday araçları VM state'ine ver; Submit bu listeden seçer (araç
+    // listesi artık intent payload'ı değil, state üzerinden akar — tek doğruluk kaynağı).
+    LaunchedEffect(vehicles) {
+        viewModel.onIntent(AiRecommendationIntent.VehiclesProvided(vehicles))
+    }
+
     // Yeni bir öneri sonucu geldiğinde haritaya uygula ve diyaloğu kapat.
     LaunchedEffect(uiState.recommendedIds) {
         if (uiState.recommendedIds.isNotEmpty()) {
@@ -97,12 +103,13 @@ fun AiRecommendationDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         AiRecommendationDialogContent(
-            query = uiState.query,
-            isLoading = uiState.isLoading,
-            error = uiState.error,
-            onQueryChanged = { viewModel.onIntent(AiRecommendationIntent.QueryChanged(it)) },
-            onSubmit = { viewModel.onIntent(AiRecommendationIntent.Submit(vehicles)) },
-            onDismiss = onDismiss,
+            uiState = uiState,
+            onIntent = { intent ->
+                when (intent) {
+                    AiRecommendationIntent.Dismiss -> onDismiss()
+                    else -> viewModel.onIntent(intent)
+                }
+            },
         )
     }
 }
@@ -113,13 +120,17 @@ fun AiRecommendationDialog(
  */
 @Composable
 private fun AiRecommendationDialogContent(
-    query: String,
-    isLoading: Boolean,
-    error: String?,
-    onQueryChanged: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onDismiss: () -> Unit,
+    uiState: AiRecommendationUiState,
+    onIntent: (AiRecommendationIntent) -> Unit,
 ) {
+    // §4.5: gövde yalnız (uiState, onIntent) alır; okunabilirlik için alanlar/aksiyonlar yerelde açılır.
+    val query = uiState.query
+    val isLoading = uiState.isLoading
+    val error = uiState.error
+    val onQueryChanged: (String) -> Unit = { onIntent(AiRecommendationIntent.QueryChanged(it)) }
+    val onSubmit: () -> Unit = { onIntent(AiRecommendationIntent.Submit) }
+    val onDismiss: () -> Unit = { onIntent(AiRecommendationIntent.Dismiss) }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth(0.92f)
@@ -264,12 +275,8 @@ private fun AiRecommendationDialogContent(
 private fun AiRecommendationDialogEmptyPreview() {
     RenCarTheme {
         AiRecommendationDialogContent(
-            query = "",
-            isLoading = false,
-            error = null,
-            onQueryChanged = {},
-            onSubmit = {},
-            onDismiss = {},
+            uiState = AiRecommendationUiState(),
+            onIntent = {},
         )
     }
 }
@@ -279,12 +286,8 @@ private fun AiRecommendationDialogEmptyPreview() {
 private fun AiRecommendationDialogLoadingPreview() {
     RenCarTheme {
         AiRecommendationDialogContent(
-            query = "2000 TL altı konforlu araç arıyorum",
-            isLoading = true,
-            error = null,
-            onQueryChanged = {},
-            onSubmit = {},
-            onDismiss = {},
+            uiState = AiRecommendationUiState(query = "2000 TL altı konforlu araç arıyorum", isLoading = true),
+            onIntent = {},
         )
     }
 }
@@ -294,12 +297,8 @@ private fun AiRecommendationDialogLoadingPreview() {
 private fun AiRecommendationDialogErrorPreview() {
     RenCarTheme {
         AiRecommendationDialogContent(
-            query = "araziye çıkacağım",
-            isLoading = false,
-            error = "Öneri alınamadı: zaman aşımı",
-            onQueryChanged = {},
-            onSubmit = {},
-            onDismiss = {},
+            uiState = AiRecommendationUiState(query = "araziye çıkacağım", error = "Öneri alınamadı: zaman aşımı"),
+            onIntent = {},
         )
     }
 }

@@ -90,8 +90,12 @@ fun ReservationScreen(
 
     ReservationScreen(
         uiState = uiState,
-        onIntent = viewModel::onIntent,
-        onBack = onNavigateBack,
+        onIntent = { intent ->
+            when (intent) {
+                ReservationIntent.BackClicked -> onNavigateBack()
+                else -> viewModel.onIntent(intent)
+            }
+        },
     )
 }
 
@@ -100,7 +104,6 @@ fun ReservationScreen(
 private fun ReservationScreen(
     uiState: ReservationUiState,
     onIntent: (ReservationIntent) -> Unit,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -108,7 +111,7 @@ private fun ReservationScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        TopBar(onBack = onBack)
+        TopBar(onBack = { onIntent(ReservationIntent.BackClicked) })
 
         val vehicle = uiState.vehicle
         when {
@@ -593,7 +596,6 @@ private fun ReservationLightPreview() {
         ReservationScreen(
             uiState = ReservationUiState(vehicle = PreviewVehicle, quote = PreviewQuote, termsAccepted = true),
             onIntent = {},
-            onBack = {},
         )
     }
 }
@@ -605,7 +607,6 @@ private fun ReservationDarkPreview() {
         ReservationScreen(
             uiState = ReservationUiState(vehicle = PreviewVehicle, quote = PreviewQuote, termsAccepted = false),
             onIntent = {},
-            onBack = {},
         )
     }
 }

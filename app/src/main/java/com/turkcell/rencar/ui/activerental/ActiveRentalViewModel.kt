@@ -59,6 +59,8 @@ class ActiveRentalViewModel @Inject constructor(
             ActiveRentalIntent.Retry -> retry()
             ActiveRentalIntent.FinishClicked -> finishRental()
             ActiveRentalIntent.LockToggle -> lockToggle()
+            // Navigasyon Screen katmanında ele alınır (§4.6).
+            ActiveRentalIntent.BackClicked -> Unit
         }
     }
 

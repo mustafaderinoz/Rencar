@@ -51,6 +51,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import com.turkcell.rencar.data.model.GeoPoint
 import com.turkcell.rencar.ui.icons.RencarIcons
 import com.turkcell.rencar.ui.theme.RenCarTheme
 import com.turkcell.rencar.ui.vehicledetail.VehicleDetailScreen
@@ -108,7 +109,7 @@ fun MapScreen(
         val callback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { loc ->
-                    viewModel.onIntent(MapIntent.LocationChanged(LatLng(loc.latitude, loc.longitude)))
+                    viewModel.onIntent(MapIntent.LocationChanged(GeoPoint(loc.latitude, loc.longitude)))
                 }
             }
         }
@@ -121,7 +122,7 @@ fun MapScreen(
     LaunchedEffect(uiState.myLocation, uiState.hasCenteredOnUser) {
         val location = uiState.myLocation ?: return@LaunchedEffect
         if (uiState.hasCenteredOnUser) return@LaunchedEffect
-        mapController.animateTo(location)
+        mapController.animateTo(location.toLatLng())
         viewModel.onIntent(MapIntent.CenteredOnUser)
     }
 
@@ -144,7 +145,7 @@ fun MapScreen(
                     if (uiState.hasLocationPermission) {
                         fetchCurrentLocation(fusedClient) { target ->
                             viewModel.onIntent(MapIntent.LocationChanged(target))
-                            mapController.animateTo(target)
+                            mapController.animateTo(target.toLatLng())
                         }
                     } else {
                         permissionLauncher.launch(LOCATION_PERMISSIONS)
@@ -200,7 +201,7 @@ private fun MapScreen(
 ) {
     Box(modifier = modifier.fillMaxSize()) {
         RencarMap(
-            myLocation = uiState.myLocation,
+            myLocation = uiState.myLocation?.toLatLng(),
             modifier = Modifier.fillMaxSize(),
             controller = controller,
             vehicles = uiState.vehicles,
@@ -320,6 +321,9 @@ private fun MapScreen(
 }
 
 
+/** UI/domain konum modelini harita motoru tipine çevirir (yalnız harita sınırında kullanılır). */
+private fun GeoPoint.toLatLng(): LatLng = LatLng(latitude, longitude)
+
 /** İnce ya da kaba konum izninden en az biri verilmiş mi. */
 private fun Context.hasLocationPermission(): Boolean =
     ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -332,7 +336,7 @@ private fun Context.hasLocationPermission(): Boolean =
  * çağıran IO dispatcher'ında yürütür. Servis yoksa veya hata olursa null döner (altyazı gizlenir).
  */
 @Suppress("DEPRECATION")
-private fun reverseGeocodeLocality(context: Context, location: LatLng): String? {
+private fun reverseGeocodeLocality(context: Context, location: GeoPoint): String? {
     if (!Geocoder.isPresent()) return null
     return runCatching {
         Geocoder(context)
@@ -346,11 +350,11 @@ private fun reverseGeocodeLocality(context: Context, location: LatLng): String? 
 @SuppressLint("MissingPermission")
 private fun fetchCurrentLocation(
     fusedClient: FusedLocationProviderClient,
-    onLocation: (LatLng) -> Unit,
+    onLocation: (GeoPoint) -> Unit,
 ) {
     fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
         .addOnSuccessListener { location ->
-            if (location != null) onLocation(LatLng(location.latitude, location.longitude))
+            if (location != null) onLocation(GeoPoint(location.latitude, location.longitude))
         }
 }
 

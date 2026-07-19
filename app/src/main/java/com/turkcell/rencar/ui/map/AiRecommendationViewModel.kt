@@ -2,7 +2,6 @@ package com.turkcell.rencar.ui.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.turkcell.rencar.data.model.VehicleUi
 import com.turkcell.rencar.data.repository.AiRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,25 +24,30 @@ class AiRecommendationViewModel @Inject constructor(
 
     fun onIntent(intent: AiRecommendationIntent) {
         when (intent) {
-            is AiRecommendationIntent.QueryChanged -> {
+            is AiRecommendationIntent.QueryChanged ->
                 _uiState.update { it.copy(query = intent.query, error = null) }
-            }
-            is AiRecommendationIntent.Submit -> {
-                recommend(intent.vehicles)
-            }
-            AiRecommendationIntent.Clear -> {
+
+            is AiRecommendationIntent.VehiclesProvided ->
+                _uiState.update { it.copy(vehicles = intent.vehicles) }
+
+            AiRecommendationIntent.Submit -> recommend()
+
+            AiRecommendationIntent.Clear ->
                 _uiState.update { AiRecommendationUiState() }
-            }
+
+            // Kapatma Screen katmanında ele alınır (§4.6).
+            AiRecommendationIntent.Dismiss -> Unit
         }
     }
 
-    private fun recommend(vehicles: List<VehicleUi>) {
-        val query = _uiState.value.query
+    private fun recommend() {
+        val state = _uiState.value
+        val query = state.query
         if (query.isBlank()) return
 
         _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch {
-            aiRepository.recommendVehicles(query, vehicles)
+            aiRepository.recommendVehicles(query, state.vehicles)
                 .onSuccess { ids ->
                     _uiState.update { it.copy(isLoading = false, recommendedIds = ids) }
                 }
