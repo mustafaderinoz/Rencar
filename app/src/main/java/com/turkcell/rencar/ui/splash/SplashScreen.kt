@@ -49,7 +49,7 @@ fun SplashScreen(
     LaunchedEffect(uiState.destination) {
         uiState.destination?.let { destination ->
             onDestinationResolved(destination)
-            viewModel.onDestinationHandled()
+            viewModel.onIntent(SplashIntent.DestinationHandled)
         }
     }
 

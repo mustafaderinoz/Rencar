@@ -3,8 +3,10 @@ package com.turkcell.rencar.ui.rentals
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.repository.RentalRepository
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Kiralamalarım ekranının tek durum kaynağı (§4.4). Sekmeye her girişte iki çağrı paralel yüklenir:
@@ -63,19 +64,12 @@ class RentalsViewModel @Inject constructor(
                     _uiState.update {
                         // Eldeki liste varken (sessiz tazeleme) hata yut; yoksa tam ekran hata göster.
                         if (it.rentals.isNotEmpty()) it.copy(isLoading = false)
-                        else it.copy(isLoading = false, loadError = e.toLoadMessage())
+                        else it.copy(
+                            isLoading = false,
+                            loadError = e.toAppError().toUserMessage(ErrorContext.RENTALS_LIST),
+                        )
                     }
                 }
         }
-    }
-
-    private fun Throwable.toLoadMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Kiralamalara erişim için hesabınızın onaylı olması gerekir."
-            else -> "Kiralamalar alınamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 }

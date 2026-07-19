@@ -5,8 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.repository.PaymentRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.FormMessages
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,7 +17,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Ödeme ekranının tek durum kaynağı (§4.4). Açılışta üç çağrı paralel yüklenir: GET /rentals/{id}
@@ -98,7 +100,12 @@ class PaymentViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, loadError = e.toLoadMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            loadError = e.toAppError().toUserMessage(ErrorContext.PAYMENT_LOAD),
+                        )
+                    }
                 }
         }
     }
@@ -123,7 +130,9 @@ class PaymentViewModel @Inject constructor(
                 PaymentMethod.CARD -> {
                     val cardId = state.selectedCardId
                     if (cardId == null) {
-                        _uiState.update { it.copy(isPaying = false, payError = "Lütfen bir kart seçin.") }
+                        _uiState.update {
+                            it.copy(isPaying = false, payError = FormMessages.CARD_REQUIRED)
+                        }
                         return@launch
                     }
                     paymentRepository.payWithCard(rentalId, cardId, code)
@@ -134,7 +143,15 @@ class PaymentViewModel @Inject constructor(
             result
                 .onSuccess { res -> _uiState.update { it.copy(isPaying = false, result = res) } }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isPaying = false, payError = e.toPayMessage(hasDiscount = code != null)) }
+                    // İndirim kodu gönderildiyse 404/409 kod-özel metne çözülsün diye ayrı bağlam.
+                    val context = if (code != null) {
+                        ErrorContext.PAYMENT_PAY_DISCOUNT
+                    } else {
+                        ErrorContext.PAYMENT_PAY
+                    }
+                    _uiState.update {
+                        it.copy(isPaying = false, payError = e.toAppError().toUserMessage(context))
+                    }
                 }
         }
     }
@@ -148,7 +165,12 @@ class PaymentViewModel @Inject constructor(
                     _uiState.update { it.copy(isPaying = false, iyzicoCheckout = checkout) }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isPaying = false, payError = e.toIyzicoMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isPaying = false,
+                            payError = e.toAppError().toUserMessage(ErrorContext.IYZICO_INIT),
+                        )
+                    }
                 }
         }
     }
@@ -173,7 +195,11 @@ class PaymentViewModel @Inject constructor(
                         _uiState.update {
                             it.copy(
                                 isPaying = false,
-                                payError = if (silentOnFailure) null else IYZICO_NOT_COMPLETED,
+                                payError = if (silentOnFailure) {
+                                    null
+                                } else {
+                                    FormMessages.IYZICO_NOT_COMPLETED
+                                },
                             )
                         }
                         return@launch
@@ -183,14 +209,24 @@ class PaymentViewModel @Inject constructor(
                         .onFailure { e ->
                             // Tahsilat yapıldı ama kiralamaya işlenemedi: sessize alınmaz, kullanıcı
                             // parasının çekildiğini ve tekrar denemesi gerektiğini bilmelidir.
-                            _uiState.update { it.copy(isPaying = false, payError = e.toIyzicoPayMessage()) }
+                            _uiState.update {
+                                it.copy(
+                                    isPaying = false,
+                                    payError = e.toAppError()
+                                        .toUserMessage(ErrorContext.IYZICO_SETTLE),
+                                )
+                            }
                         }
                 }
                 .onFailure { e ->
                     _uiState.update {
                         it.copy(
                             isPaying = false,
-                            payError = if (silentOnFailure) null else e.toIyzicoMessage(),
+                            payError = if (silentOnFailure) {
+                                null
+                            } else {
+                                e.toAppError().toUserMessage(ErrorContext.IYZICO_INIT)
+                            },
                         )
                     }
                 }
@@ -236,7 +272,12 @@ class PaymentViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(deletingCardId = null, payError = e.toDeleteCardMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            deletingCardId = null,
+                            payError = e.toAppError().toUserMessage(ErrorContext.CARD_DELETE),
+                        )
+                    }
                 }
         }
     }
@@ -273,7 +314,12 @@ class PaymentViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isAddingCard = false, addCardError = e.toAddCardMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isAddingCard = false,
+                            addCardError = e.toAppError().toUserMessage(ErrorContext.CARD_ADD),
+                        )
+                    }
                 }
         }
     }
@@ -289,94 +335,5 @@ class PaymentViewModel @Inject constructor(
                 addCardError = null,
             )
         }
-    }
-
-    private fun Throwable.toLoadMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            404 -> "Ödenecek yolculuk bulunamadı."
-            else -> "Ödeme bilgileri alınamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    /**
-     * [hasDiscount] true ise (indirim kodu gönderilmişti) 404/409 mesajları kod-özel hale getirilir:
-     * API'de indirim kodu doğrulama ucu olmadığından geçersiz kod ancak ödeme anında anlaşılır.
-     */
-    private fun Throwable.toPayMessage(hasDiscount: Boolean): String = when (this) {
-        is HttpException -> when (code()) {
-            400 -> "Ödeme bilgileri geçersiz."
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Bu yolculuk size ait değil."
-            404 -> if (hasDiscount) {
-                "Girdiğiniz indirim kodu bulunamadı. Kodu kontrol edin ya da kaldırıp tekrar deneyin."
-            } else {
-                "Yolculuk veya kart bulunamadı."
-            }
-            409 -> if (hasDiscount) {
-                "İndirim kodu kullanılamıyor (limit dolmuş veya daha önce kullanılmış) ya da bakiye yetersiz. " +
-                    "Kodu kaldırıp tekrar deneyebilirsiniz."
-            } else {
-                "Ödeme alınamadı: cüzdan bakiyesi yetersiz olabilir veya yolculuk zaten ödenmiş."
-            }
-            else -> "Ödeme alınamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    /** İyzico sayfası açma / sonuç sorgulama hataları (initialize + result uçları). */
-    private fun Throwable.toIyzicoMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            400 -> "İyzico ödeme isteğini reddetti. Lütfen tekrar deneyin."
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Bu işlem için yetkiniz yok."
-            503 -> "Ödeme sağlayıcı şu anda kullanılamıyor. Cüzdan veya kartla ödeyebilirsiniz."
-            else -> "İyzico ödemesi başlatılamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    /**
-     * Tahsilat İyzico'da BAŞARILI olduktan sonra POST /rentals/{id}/pay başarısızsa gösterilir.
-     * Para çekilmiş olduğundan mesaj bunu gizlemez.
-     */
-    private fun Throwable.toIyzicoPayMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            409 -> "Bu yolculuğun ödemesi zaten alınmış görünüyor."
-            else -> "Ödemeniz alındı ancak yolculuğa işlenemedi (${code()}). " +
-                "Lütfen tekrar deneyin; tutar iki kez tahsil edilmez."
-        }
-        is IOException -> "Ödemeniz alındı ancak bağlantı koptuğu için işlenemedi. Lütfen tekrar deneyin."
-        else -> "Ödemeniz alındı ancak yolculuğa işlenemedi. Lütfen tekrar deneyin."
-    }
-
-    private fun Throwable.toDeleteCardMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            404 -> "Kart bulunamadı."
-            else -> "Kart silinemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private fun Throwable.toAddCardMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            400 -> "Kart bilgileri geçersiz (son kullanma tarihi geçmiş olabilir)."
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            else -> "Kart kaydedilemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private companion object {
-        /** Ödeme sayfası kapandı ama İyzico tahsilatı SUCCESS değil (iptal/red/yarım kalan 3DS). */
-        const val IYZICO_NOT_COMPLETED =
-            "Ödeme tamamlanmadı. Kartınızdan tutar çekilmedi; tekrar deneyebilirsiniz."
     }
 }

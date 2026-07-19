@@ -8,6 +8,7 @@ import com.turkcell.rencar.data.model.RegisterError
 import com.turkcell.rencar.data.model.RegisterException
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
+import com.turkcell.rencar.util.FormMessages
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +72,9 @@ class RegisterViewModel @Inject constructor(
             // Navigasyon ekran (Screen) katmanında ele alınır.
             RegisterIntent.BackClicked -> Unit
             RegisterIntent.LoginClicked -> Unit
+
+            // Ekran geçişi yaptı → bayrağı tüket (tekrar geçişi önler).
+            RegisterIntent.RegisteredHandled -> _uiState.update { it.copy(registered = false) }
         }
     }
 
@@ -107,21 +111,16 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-    /** Ekran, registered bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
-    fun onRegisteredHandled() {
-        _uiState.update { it.copy(registered = false) }
-    }
-
     /** Zorunlu alanları yerel olarak doğrular; davet kodu isteğe bağlı olduğundan kontrol edilmez. */
     private fun RegisterUiState.validate(): RegisterUiState = copy(
-        fullNameError = "Ad soyad boş olamaz.".takeIf { fullName.isBlank() },
-        emailError = "Geçerli bir e-posta adresi gir.".takeIf {
+        fullNameError = FormMessages.FULL_NAME_BLANK.takeIf { fullName.isBlank() },
+        emailError = FormMessages.INVALID_EMAIL.takeIf {
             !Patterns.EMAIL_ADDRESS.matcher(email).matches()
         },
-        passwordError = "Şifre en az $PASSWORD_MIN_LENGTH karakter olmalı.".takeIf {
+        passwordError = FormMessages.passwordTooShort(PASSWORD_MIN_LENGTH).takeIf {
             password.length < PASSWORD_MIN_LENGTH
         },
-        phoneError = "Geçerli bir telefon numarası gir.".takeIf { phone.length != PHONE_DIGIT_COUNT },
+        phoneError = FormMessages.INVALID_PHONE.takeIf { phone.length != PHONE_DIGIT_COUNT },
     )
 
     private val RegisterUiState.hasFieldError: Boolean
@@ -129,27 +128,28 @@ class RegisterViewModel @Inject constructor(
             passwordError != null || phoneError != null
 
     /**
-     * Tiplenmiş kayıt hatasını ilgili alana yazar. Çakışan e-posta/telefon AYNI HTTP kodunu (409)
-     * döndüğünden ayrım mapper katmanında yapılır; burada yalnız alan eşlemesi kalır.
+     * Tiplenmiş kayıt hatasını ilgili ALANA yazar. Çakışan e-posta/telefon AYNI HTTP kodunu (409)
+     * döndüğünden ayrım mapper katmanında yapılır; metinler [FormMessages]'ta durur — burada yalnız
+     * hangi alanın işaretleneceği kalır.
      */
     private fun RegisterError.applyTo(state: RegisterUiState): RegisterUiState = when (this) {
         RegisterError.EmailTaken ->
-            state.copy(emailError = "Bu e-posta adresi zaten kayıtlı.")
+            state.copy(emailError = FormMessages.EMAIL_TAKEN)
 
         RegisterError.PhoneTaken ->
-            state.copy(phoneError = "Bu telefon numarası zaten kayıtlı.")
+            state.copy(phoneError = FormMessages.PHONE_TAKEN)
 
         RegisterError.InvalidReferral ->
-            state.copy(referralCodeError = "Davet kodu geçersiz.")
+            state.copy(referralCodeError = FormMessages.INVALID_REFERRAL)
 
         // Sunucunun kendi (Türkçe, kullanıcıya gösterilebilir) doğrulama metinleri.
         is RegisterError.Validation ->
             state.copy(formError = messages.joinToString("\n"))
 
         RegisterError.Network ->
-            state.copy(formError = "İnternet bağlantısı kurulamadı.")
+            state.copy(formError = FormMessages.REGISTER_NETWORK)
 
         RegisterError.Unknown ->
-            state.copy(formError = "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.")
+            state.copy(formError = FormMessages.REGISTER_UNKNOWN)
     }
 }

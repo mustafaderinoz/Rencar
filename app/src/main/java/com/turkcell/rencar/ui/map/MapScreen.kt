@@ -172,10 +172,15 @@ fun MapScreen(
                     }
                 }
 
+                // Navigasyon sarmalayıcıda yakalanır (§4.5); seçim VM'de temizlenir.
+                is MapIntent.ReserveClicked -> {
+                    viewModel.onIntent(MapIntent.VehicleDismissed)
+                    onNavigateToReservation(intent.vehicleId)
+                }
+
                 else -> viewModel.onIntent(intent)
             }
         },
-        onNavigateToReservation = onNavigateToReservation,
         modifier = modifier,
     )
 
@@ -196,7 +201,6 @@ private fun MapScreen(
     uiState: MapUiState,
     controller: RencarMapController,
     onIntent: (MapIntent) -> Unit,
-    onNavigateToReservation: (vehicleId: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -310,10 +314,8 @@ private fun MapScreen(
                     userLatitude = uiState.myLocation?.latitude,
                     userLongitude = uiState.myLocation?.longitude,
                     // "Rezerve Et" → alt sayfayı kapat ve rezervasyon onayına git.
-                    onReserve = {
-                        onIntent(MapIntent.VehicleDismissed)
-                        onNavigateToReservation(selectedVehicleId)
-                    },
+                    // Navigasyonu sarmalayıcı yakalar (§4.5).
+                    onReserve = { onIntent(MapIntent.ReserveClicked(selectedVehicleId)) },
                 )
             }
         }

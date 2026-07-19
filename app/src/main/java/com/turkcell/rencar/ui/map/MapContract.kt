@@ -89,6 +89,12 @@ sealed interface MapIntent {
     /** Detay alt sayfası kapatıldı; seçim temizlenir. */
     data object VehicleDismissed : MapIntent
 
+    /**
+     * Detay alt sayfasındaki "Rezerve Et" — seçim temizlenir ve rezervasyon ekranına geçilir.
+     * Navigasyonu stateful sarmalayıcı yakalar (§4.5).
+     */
+    data class ReserveClicked(val vehicleId: String) : MapIntent
+
     /** Sağ alt "+" butonu: kamerayı bir kademe yakınlaştır (Screen'de ele alınır). */
     data object ZoomIn : MapIntent
 

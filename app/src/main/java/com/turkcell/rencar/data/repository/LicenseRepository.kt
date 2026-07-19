@@ -3,7 +3,7 @@ package com.turkcell.rencar.data.repository
 import com.turkcell.rencar.data.mapper.toVerificationStatus
 import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.remote.api.LicenseApi
-import com.turkcell.rencar.data.util.toImagePart
+import com.turkcell.rencar.data.image.toImagePart
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton

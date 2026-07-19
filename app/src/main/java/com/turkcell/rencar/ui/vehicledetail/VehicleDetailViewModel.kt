@@ -5,15 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.model.VehicleUi
 import com.turkcell.rencar.data.repository.VehicleRepository
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Araç Detay ekranının tek durum kaynağı (§4.4). GET /vehicles/{id} ile aracı çeker (statik değil)
@@ -61,7 +62,12 @@ class VehicleDetailViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = e.toAppError().toUserMessage(ErrorContext.VEHICLE_DETAIL),
+                        )
+                    }
                 }
         }
     }
@@ -72,16 +78,5 @@ class VehicleDetailViewModel @Inject constructor(
         val results = FloatArray(1)
         Location.distanceBetween(userLat, userLng, vehicle.latitude, vehicle.longitude, results)
         return results[0]
-    }
-
-    private fun Throwable.toMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Araç detayını görmek için ehliyet onayınız gerekli."
-            404 -> "Bu araç şu anda müsait değil."
-            else -> "Araç yüklenemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 }

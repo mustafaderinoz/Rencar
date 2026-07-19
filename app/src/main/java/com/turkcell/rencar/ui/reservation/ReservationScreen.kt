@@ -75,7 +75,7 @@ fun ReservationScreen(
         if (uiState.reserved) {
             Toast.makeText(context, "Araç $FreeReservationLabel için rezerve edildi.", Toast.LENGTH_SHORT).show()
             onReserved(uiState.vehicle?.id.orEmpty(), uiState.selectedPlan)
-            viewModel.onReservedHandled()
+            viewModel.onIntent(ReservationIntent.ReservedHandled)
         }
     }
 
@@ -84,7 +84,7 @@ fun ReservationScreen(
         uiState.startedRentalId?.let { rentalId ->
             Toast.makeText(context, "Günlük kiralamanız başladı.", Toast.LENGTH_SHORT).show()
             onDailyRentalStarted(rentalId)
-            viewModel.onRentalStartedHandled()
+            viewModel.onIntent(ReservationIntent.RentalStartedHandled)
         }
     }
 

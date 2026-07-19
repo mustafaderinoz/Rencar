@@ -7,8 +7,10 @@ import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.data.repository.LicenseRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -17,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 @HiltViewModel
 class OtpVerificationViewModel @Inject constructor(
@@ -73,6 +74,9 @@ class OtpVerificationViewModel @Inject constructor(
 
             // Navigasyon ekran katmanında ele alınır.
             OtpVerificationIntent.BackClicked -> Unit
+
+            // Ekran geçişi yaptı → bayrağı tüket (tekrar geçişi önler).
+            OtpVerificationIntent.VerifiedHandled -> _uiState.update { it.copy(verified = false) }
         }
     }
 
@@ -95,7 +99,12 @@ class OtpVerificationViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = e.toAppError().toUserMessage(ErrorContext.OTP),
+                        )
+                    }
                 }
         }
     }
@@ -115,20 +124,6 @@ class OtpVerificationViewModel @Inject constructor(
             LicenseVerificationStatus.APPROVED -> PostVerifyDestination.HOME
             else -> PostVerifyDestination.LICENSE_UPLOAD
         }
-    }
-
-    /** Ekran, verified bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
-    fun onVerifiedHandled() {
-        _uiState.update { it.copy(verified = false) }
-    }
-
-    private fun Throwable.toMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Kod geçersiz veya süresi dolmuş."
-            else -> "Bir hata oluştu (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 
     companion object {

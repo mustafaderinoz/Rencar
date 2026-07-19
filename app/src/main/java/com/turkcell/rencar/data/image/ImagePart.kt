@@ -1,4 +1,4 @@
-package com.turkcell.rencar.data.util
+package com.turkcell.rencar.data.image
 
 import java.io.File
 import okhttp3.MediaType.Companion.toMediaType

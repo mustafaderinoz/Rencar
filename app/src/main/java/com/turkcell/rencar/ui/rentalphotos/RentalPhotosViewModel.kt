@@ -6,9 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.model.RentalPhotosUi
 import com.turkcell.rencar.data.repository.RentalRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +18,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Araç durumu (kiralama öncesi fotoğraf) ekranının tek durum kaynağı (§4.4).
@@ -68,6 +69,9 @@ class RentalPhotosViewModel @Inject constructor(
             RentalPhotosIntent.StartClicked -> startRental()
             // Navigasyon Screen katmanında ele alınır (§4.6).
             RentalPhotosIntent.BackClicked -> Unit
+
+            // Ekran geçişi yaptı → bayrağı tüket (tekrar geçişi önler).
+            RentalPhotosIntent.StartedHandled -> _uiState.update { it.copy(started = false) }
         }
     }
 
@@ -86,14 +90,14 @@ class RentalPhotosViewModel @Inject constructor(
                     _uiState.update { it.copy(isStarting = false, started = true) }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isStarting = false, errorMessage = e.toStartMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isStarting = false,
+                            errorMessage = e.toAppError().toUserMessage(ErrorContext.RIDE_START),
+                        )
+                    }
                 }
         }
-    }
-
-    /** Ekran, started bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
-    fun onStartedHandled() {
-        _uiState.update { it.copy(started = false) }
     }
 
     /** POST /rentals: PREPARING kiralamayı açar; başlık için araç özetini state'e alır. */
@@ -112,7 +116,12 @@ class RentalPhotosViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isCreating = false, createError = e.toCreateMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isCreating = false,
+                            createError = e.toAppError().toUserMessage(ErrorContext.RENTAL_CREATE),
+                        )
+                    }
                 }
         }
     }
@@ -141,7 +150,8 @@ class RentalPhotosViewModel @Inject constructor(
                         it.copy(
                             uploadingSide = null,
                             capturedPaths = it.capturedPaths - side,
-                            errorMessage = e.toUploadMessage(),
+                            errorMessage = e.toAppError()
+                                .toUserMessage(ErrorContext.RENTAL_PHOTO_UPLOAD),
                         )
                     }
                 }
@@ -155,42 +165,4 @@ class RentalPhotosViewModel @Inject constructor(
             uploadedCount = state.uploadedCount,
             photosComplete = state.photosComplete,
         )
-
-    private fun Throwable.toCreateMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Kiralama için ehliyet onayınız gerekli."
-            404 -> "Araç bulunamadı."
-            409 -> "Kiralama başlatılamadı: rezervasyonunuz bulunamadı veya araç müsait değil."
-            else -> "Kiralama oluşturulamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private fun Throwable.toStartMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Bu kiralama size ait değil."
-            404 -> "Kiralama bulunamadı."
-            409 -> "Yolculuk başlatılamadı: fotoğraflar eksik veya yolculuk zaten başlamış."
-            else -> "Yolculuk başlatılamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private fun Throwable.toUploadMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            400 -> "Fotoğraf geçersiz. Lütfen tekrar çekin."
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Bu kiralama size ait değil."
-            404 -> "Kiralama bulunamadı."
-            409 -> "Yolculuk zaten başlamış; fotoğraf eklenemiyor."
-            413 -> "Fotoğraf çok büyük (maks. 5MB)."
-            else -> "Fotoğraf yüklenemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
 }

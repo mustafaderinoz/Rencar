@@ -33,12 +33,10 @@ class LicenseViewModel @Inject constructor() : ViewModel() {
 
             // Navigasyon ekran katmanında ele alınır.
             LicenseIntent.BackClicked -> Unit
-        }
-    }
 
-    /** Ekran, proceed bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
-    fun onProceedHandled() {
-        _uiState.update { it.copy(proceed = false) }
+            // Ekran geçişi yaptı → bayrağı tüket (tekrar geçişi önler).
+            LicenseIntent.ProceedHandled -> _uiState.update { it.copy(proceed = false) }
+        }
     }
 
     private fun LicenseUiState.withContinueFlag(): LicenseUiState =

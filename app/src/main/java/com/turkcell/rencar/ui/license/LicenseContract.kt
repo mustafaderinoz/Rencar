@@ -23,4 +23,7 @@ sealed interface LicenseIntent {
     data class BackCaptured(val path: String) : LicenseIntent
     data object ContinueClicked : LicenseIntent
     data object BackClicked : LicenseIntent
+
+    /** Ekran [LicenseUiState.proceed] geçişini yaptı → bayrak tüketilir. */
+    data object ProceedHandled : LicenseIntent
 }

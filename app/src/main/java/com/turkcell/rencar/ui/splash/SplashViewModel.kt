@@ -6,6 +6,8 @@ import com.turkcell.rencar.data.local.TokenStore
 import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.data.repository.LicenseRepository
+import com.turkcell.rencar.util.isUnauthorized
+import com.turkcell.rencar.util.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Açılış (session restore) ViewModel'i (§4.4).
@@ -40,6 +41,9 @@ class SplashViewModel @Inject constructor(
     fun onIntent(intent: SplashIntent) {
         when (intent) {
             SplashIntent.Retry -> restoreSession()
+
+            // Ekran geçişi yaptı → hedefi tüket (tekrar geçişi önler).
+            SplashIntent.DestinationHandled -> _uiState.update { it.copy(destination = null) }
         }
     }
 
@@ -62,7 +66,7 @@ class SplashViewModel @Inject constructor(
             authRepository.me()
                 .onSuccess { user -> emit(resolveDestination(user.role)) }
                 .onFailure { e ->
-                    if (e is HttpException && e.code() == 401) {
+                    if (e.toAppError().isUnauthorized) {
                         emit(SplashDestination.LOGIN)
                     } else {
                         _uiState.update { it.copy(isLoading = false, isError = true) }
@@ -84,11 +88,6 @@ class SplashViewModel @Inject constructor(
             LicenseVerificationStatus.APPROVED -> SplashDestination.HOME
             else -> SplashDestination.LICENSE_UPLOAD
         }
-    }
-
-    /** Ekran, [SplashUiState.destination]'ı navigasyonda tüketince çağrılır (tekrar geçişi önler). */
-    fun onDestinationHandled() {
-        _uiState.update { it.copy(destination = null) }
     }
 
     private fun emit(destination: SplashDestination) {

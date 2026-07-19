@@ -29,4 +29,10 @@ sealed interface LoginIntent {
     data object SendCodeClicked : LoginIntent
     data object BackClicked : LoginIntent
     data object RegisterClicked : LoginIntent
+
+    /** Ekran [LoginUiState.codeSent] geçişini yaptı → bayrak tüketilir (tekrar geçişi önler). */
+    data object CodeSentHandled : LoginIntent
+
+    /** Ekran [LoginUiState.navigateToRegister] geçişini yaptı → bayrak tüketilir. */
+    data object NavigateToRegisterHandled : LoginIntent
 }

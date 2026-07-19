@@ -33,4 +33,7 @@ sealed interface OtpVerificationIntent {
     data object VerifyClicked : OtpVerificationIntent
     data object ResendCodeClicked : OtpVerificationIntent
     data object BackClicked : OtpVerificationIntent
+
+    /** Ekran [OtpVerificationUiState.verified] geçişini yaptı → bayrak tüketilir. */
+    data object VerifiedHandled : OtpVerificationIntent
 }

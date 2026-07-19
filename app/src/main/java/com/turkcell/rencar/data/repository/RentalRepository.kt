@@ -12,7 +12,7 @@ import com.turkcell.rencar.data.model.VehiclePoint
 import com.turkcell.rencar.data.remote.api.RentalApi
 import com.turkcell.rencar.data.remote.dto.CreateRentalRequest
 import com.turkcell.rencar.data.remote.socket.RideLocationClient
-import com.turkcell.rencar.data.util.toImagePart
+import com.turkcell.rencar.data.image.toImagePart
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar

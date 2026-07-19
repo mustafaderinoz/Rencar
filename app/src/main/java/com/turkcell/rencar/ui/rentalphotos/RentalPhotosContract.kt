@@ -81,4 +81,7 @@ sealed interface RentalPhotosIntent {
 
     /** Üst baştaki geri butonu — navigasyon Screen katmanında ele alınır (§4.5/§4.6). */
     data object BackClicked : RentalPhotosIntent
+
+    /** Ekran [RentalPhotosUiState.started] geçişini yaptı → bayrak tüketilir. */
+    data object StartedHandled : RentalPhotosIntent
 }

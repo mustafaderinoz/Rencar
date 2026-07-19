@@ -5,15 +5,16 @@ import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.data.repository.LicenseRepository
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Profil ekranının tek durum kaynağı (§4.4). GET /auth/me ile ad/telefon, GET /license/status
@@ -75,7 +76,12 @@ class ProfileViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = e.toAppError().toUserMessage(ErrorContext.PROFILE),
+                        )
+                    }
                 }
         }
     }
@@ -95,14 +101,5 @@ class ProfileViewModel @Inject constructor(
             }
         }
         return "+90 $grouped"
-    }
-
-    private fun Throwable.toMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            else -> "Profil yüklenemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 }
