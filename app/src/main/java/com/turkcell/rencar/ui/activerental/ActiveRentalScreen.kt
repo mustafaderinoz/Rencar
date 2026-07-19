@@ -60,19 +60,19 @@ private val DangerRed = Color(0xFFF1584F)
 @Composable
 fun ActiveRentalScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToPayment: (String) -> Unit,
+    onNavigateToReturnPhotos: (rentalId: String, vehicleTitle: String, vehiclePlate: String) -> Unit,
     viewModel: ActiveRentalViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // "Kiralamayı Bitir" başarılı olunca (receipt geldi) ödeme ekranına geç; bu ekran backstack'ten
-    // çıkar (finish tek yönlüdür). Navigasyon ekran katmanında sürülür (VM'de Effect kanalı yok, §4.6).
-    // Kısa bir bekleme, "Yolculuk tamamlandı" özetinin + yönlendirme mesajının kullanıcıya görünmesi
-    // içindir (anında geçince göz atamıyordu).
+    // "Kiralamayı Bitir" başarılı olunca (receipt geldi) araç teslim fotoğrafı ekranına geç; ödeme
+    // oradan açılır. Bu ekran backstack'ten çıkar (finish tek yönlüdür). Navigasyon ekran katmanında
+    // sürülür (VM'de Effect kanalı yok, §4.6). Kısa bir bekleme, "Yolculuk tamamlandı" özetinin +
+    // yönlendirme mesajının kullanıcıya görünmesi içindir (anında geçince göz atamıyordu).
     LaunchedEffect(uiState.isFinished) {
         if (uiState.isFinished) {
             delay(FINISH_TO_PAYMENT_DELAY_MS)
-            onNavigateToPayment(uiState.rentalId)
+            onNavigateToReturnPhotos(uiState.rentalId, uiState.vehicleTitle, uiState.vehiclePlate)
         }
     }
 
@@ -355,7 +355,7 @@ private fun StartHintBanner() {
         icon = RencarIcons.Lock,
         iconTint = RencarBlue,
         background = RencarBlue.copy(alpha = 0.08f),
-        text = "Yolculuğu başlatmak için aşağıdaki “Kilitle / Aç” düğmesine dokunun; " +
+        text = "Yolculuğu başlatmak için aşağıdaki “Kilitle / Aç„ düğmesine dokunun; " +
             "süre ve ücret bundan sonra işlemeye başlar.",
     )
 }
@@ -380,7 +380,7 @@ private fun FinishedBanner(receipt: RentalReceiptUi?) {
         icon = RencarIcons.Check,
         iconTint = MaterialTheme.rencar.success,
         background = MaterialTheme.rencar.successContainer.copy(alpha = 0.5f),
-        text = "Yolculuk tamamlandı — toplam ${formatCost(total)}. Ödemeye geçiliyor…",
+        text = "Yolculuk tamamlandı — toplam ${formatCost(total)}. Teslim fotoğraflarına geçiliyor…",
     )
 }
 

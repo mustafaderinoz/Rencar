@@ -516,3 +516,28 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** yeni `di/AiModule`, `data/mapper/AiMapper`; güncellenen `data/repository/AiRepository` (GenerativeModel inject + mapper'a devir). `ui/map/AiRecommendation*` ve `MapViewModel`/`MapContract` bu adımda DEĞİŞMEDİ.
 
 - Not (19.07.2026): Katman hizalaması yapıldı; derleme doğrulaması kullanıcı ortamında alınacak.
+
+---
+
+### Araç Teslim Fotoğraf Ekranı (kiralama sonrası · ödeme öncesi) — MOCK
+
+- Seçim: **"Kiralamayı Bitir" (`POST /rentals/{id}/finish`) BAŞARILI olduktan sonra doğrudan Ödeme ekranına geçilmez; araya yeni `rental_return_photos/{rentalId}` ekranı girer.** Ekran, kiralama öncesi `ui/rentalphotos/*` ekranıyla tasarım ve işlev olarak aynıdır (2×2 Ön/Arka/Sol/Sağ ızgarası, "N / 4 çekildi" sayacı, yeşil onay rozeti, kesikli boş kart, sarı uyarı şeridi); yalnız metinler teslim akışına uyarlanmıştır ("Araç teslim durumu" / "Teslimden önce 4 yönü çek") ve alt buton **"Ödeme Ekranına Geç"**tir (eksikken pasif + "· N foto kaldı"). 4 yön tamamlanınca `payment/{rentalId}` açılır.
+
+- Son Güncelleme Tarihi: 19.07.2026
+
+- **MOCK — fotoğraflar sunucuya GÖNDERİLMEZ (§2.2 uydurmak yasak; kullanıcıya sorulup onaylandı):** openapi.json'da **teslim fotoğrafı ucu YOKTUR**. Var olan `POST /rentals/{id}/photos` yalnız **PREPARING** aşaması içindir ve sonrasında **409** döner ("Yolculuk PREPARING aşamasında değil"). Bu yüzden yeni ekran ağ çağrısı yapmaz: çekilen kareler `filesDir/rental-return-photos/` altında tutulur, sayaç yerel state'ten ilerler. Uç eklendiğinde değişiklik **tek noktadadır** (ViewModel'e repository çağrısı); ekran/tasarım/navigasyon aynı kalır.
+
+- **Finish sırası — önce finish, sonra foto (alternatif reddedildi):** Ücret `finish` ile o anda kilitlendiğinden foto çekerken geçen süre **faturalanmaz**; bu, başlangıç akışındaki "foto çekerken geçen süre faturalanmaz" (`POST /rentals/{id}/start` → `startedAt` o anda atılır) ilkesiyle tutarlıdır. Reddedilen alternatif: foto ekranındaki butonun finish'i çağırması — kiralama foto boyunca ACTIVE kalır ve o süre faturaya eklenirdi.
+
+- **Yeni bağımlılık YOK.** Kamera, `ui/rentalphotos` ile aynı kalıpla harici çekimdir (`ActivityResultContracts.TakePicture` + `FileProvider`; CameraX kullanılmaz — bkz. "Ehliyet Görsel Kaynağı").
+
+- **Kararlar/sapmalar:**
+  - **Enum kopyalanmadı, ayrıştırıldı:** yeni `ReturnPhotoSide`, `rentalphotos.PhotoSide`'dan ayrıdır — orada `apiValue` (POST `side` parametresi) vardır, burada yükleme olmadığı için yoktur. Ortak bir enum, var olmayan bir API sözleşmesini teslim akışına da taşırdı.
+  - **Araç özeti nav argümanıyla taşınır** (`?vehicleTitle=…&vehiclePlate=…`, boş olabildiği için path değil query + `defaultValue = ""`): `ActiveRentalUiState` bu bilgiyi zaten tutuyor; ekstra `GET /rentals/{id}` çağrısı eklenmedi ("Minimum Değişiklik"). ViewModel bu yüzden **repository almaz** — saf yerel state.
+  - **Kart spinner'ı yok:** yükleme adımı olmadığından `rentalphotos`'taki `uploadingSide`/hata dalları taşınmadı (mock'ta karşılığı yok).
+  - **Geri yığını:** `active_rental` → teslim foto geçişinde `popUpTo(ACTIVE_RENTAL) { inclusive = true }`, teslim foto → `payment` geçişinde `popUpTo(RENTAL_RETURN_PHOTOS) { inclusive = true }`. Finish tek yönlü olduğundan ödemeden geri → Home.
+  - Navigasyon ekran katmanındadır (`ActiveRentalScreen` `LaunchedEffect(isFinished)` → `onNavigateToReturnPhotos`); VM'de Effect kanalı eklenmedi (§4.6).
+
+- **Dokunulan/eklenen dosyalar:** yeni `ui/rentalreturnphotos/{RentalReturnPhotosContract,RentalReturnPhotosViewModel,RentalReturnPhotosScreen}`; güncellenen `ui/navigation/RencarDestinations` (RENTAL_RETURN_PHOTOS rotası + `rentalReturnPhotosRoute`), `ui/navigation/RencarNavHost` (yeni composable + ActiveRental geçişi), `ui/activerental/ActiveRentalScreen` (`onNavigateToPayment` → `onNavigateToReturnPhotos`; "Ödemeye yönlendiriliyorsunuz…" metinleri teslim adımına göre güncellendi).
+
+- Not (19.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Emülatör/cihaz doğrulaması yapılmadı.

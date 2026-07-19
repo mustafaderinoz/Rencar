@@ -107,6 +107,29 @@ object RencarDestinations {
     /** Somut aktif yolculuk rotasını üretir ([Uri.encode] ile güvenli kodlama). */
     fun activeRentalRoute(rentalId: String): String = "$ACTIVE_RENTAL/${Uri.encode(rentalId)}"
 
+    // 09b Araç teslim durumu (kiralama sonrası fotoğraf) — "Kiralamayı Bitir" (finish BAŞARILI)
+    // sonrası ödemeden ÖNCE araya girer. Kiralama id'si path, araç özeti (başlık/plaka) İSTEĞE
+    // BAĞLI query argümanıdır (boş olabildiğinden path değil; defaultValue = "").
+    // Fotoğraflar yalnız cihazda tutulur — teslim-foto ucu backend'de yoktur (§2.2, mock).
+    const val RENTAL_RETURN_PHOTOS = "rental_return_photos"
+    const val RENTAL_RETURN_PHOTOS_ARG_RENTAL_ID = "rentalId"
+    const val RENTAL_RETURN_PHOTOS_ARG_VEHICLE_TITLE = "vehicleTitle"
+    const val RENTAL_RETURN_PHOTOS_ARG_VEHICLE_PLATE = "vehiclePlate"
+    const val RENTAL_RETURN_PHOTOS_ROUTE =
+        "$RENTAL_RETURN_PHOTOS/{$RENTAL_RETURN_PHOTOS_ARG_RENTAL_ID}" +
+            "?$RENTAL_RETURN_PHOTOS_ARG_VEHICLE_TITLE={$RENTAL_RETURN_PHOTOS_ARG_VEHICLE_TITLE}" +
+            "&$RENTAL_RETURN_PHOTOS_ARG_VEHICLE_PLATE={$RENTAL_RETURN_PHOTOS_ARG_VEHICLE_PLATE}"
+
+    /** Somut teslim fotoğrafı rotasını üretir ([Uri.encode] ile güvenli kodlama). */
+    fun rentalReturnPhotosRoute(
+        rentalId: String,
+        vehicleTitle: String = "",
+        vehiclePlate: String = "",
+    ): String =
+        "$RENTAL_RETURN_PHOTOS/${Uri.encode(rentalId)}" +
+            "?$RENTAL_RETURN_PHOTOS_ARG_VEHICLE_TITLE=${Uri.encode(vehicleTitle)}" +
+            "&$RENTAL_RETURN_PHOTOS_ARG_VEHICLE_PLATE=${Uri.encode(vehiclePlate)}"
+
     // 10 Ödeme — "Kiralamayı Bitir" (POST /rentals/{id}/finish) sonrası açılır. Ödenecek kiralamanın
     // id'sini path argümanı taşır: "payment/{rentalId}". Ekran GET /rentals/{id} ile ücret dökümünü,
     // GET /cards ile kartları, GET /wallet ile bakiyeyi çeker; POST /rentals/{id}/pay ile öder.

@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    FileProvider yolları. Ehliyet çekimleri (filesDir/licenses/) ve kiralama öncesi araç
-    fotoğrafları (filesDir/rental-photos/) uygulamaya özel iç depoda tutulur; harici kamera
-    uygulamasına bu alt yollar için geçici yazma izni verilir (grantUriPermissions).
+    FileProvider yolları. Ehliyet çekimleri (filesDir/licenses/), kiralama öncesi araç fotoğrafları
+    (filesDir/rental-photos/) ve kiralama sonrası teslim fotoğrafları (filesDir/rental-return-photos/)
+    uygulamaya özel iç depoda tutulur; harici kamera uygulamasına bu alt yollar için geçici yazma
+    izni verilir (grantUriPermissions).
+
+    NOT: Her klasörün AYRI girdisi olmalıdır — "rental-photos/" öneki "rental-return-photos/" ile
+    EŞLEŞMEZ; eksik girdi getUriForFile'da IllegalArgumentException ile uygulamayı düşürür.
 -->
 <paths>
     <files-path
@@ -11,4 +15,7 @@
     <files-path
         name="rental-photos"
         path="rental-photos/" />
+    <files-path
+        name="rental-return-photos"
+        path="rental-return-photos/" />
 </paths>

@@ -27,6 +27,7 @@ import com.turkcell.rencar.ui.otp.OtpVerificationScreen
 import com.turkcell.rencar.ui.payment.PaymentScreen
 import com.turkcell.rencar.ui.register.RegisterScreen
 import com.turkcell.rencar.ui.rentalphotos.RentalPhotosScreen
+import com.turkcell.rencar.ui.rentalreturnphotos.RentalReturnPhotosScreen
 import com.turkcell.rencar.ui.reservation.ReservationScreen
 import com.turkcell.rencar.ui.selfie.SelfieScreen
 import com.turkcell.rencar.ui.splash.SplashDestination
@@ -271,11 +272,42 @@ fun RencarNavHost(
         ) {
             ActiveRentalScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // "Kiralamayı Bitir" (POST /rentals/{id}/finish) başarılı → Ödeme ekranı. Aktif yolculuk
-                // geri yığından çıkar: ödemeden geri → Home (finish tek yönlüdür).
-                onNavigateToPayment = { rentalId ->
-                    navController.navigate(RencarDestinations.paymentRoute(rentalId)) {
+                // "Kiralamayı Bitir" (POST /rentals/{id}/finish) başarılı → Araç teslim durumu (foto)
+                // ekranı; ödeme oradan açılır. Aktif yolculuk geri yığından çıkar (finish tek yönlüdür).
+                onNavigateToReturnPhotos = { rentalId, vehicleTitle, vehiclePlate ->
+                    navController.navigate(
+                        RencarDestinations.rentalReturnPhotosRoute(rentalId, vehicleTitle, vehiclePlate),
+                    ) {
                         popUpTo(RencarDestinations.ACTIVE_RENTAL_ROUTE) { inclusive = true }
+                    }
+                },
+            )
+        }
+        // Araç teslim durumu (kiralama sonrası fotoğraf): rentalId path + araç özeti query argümanı
+        // (RentalReturnPhotosViewModel SavedStateHandle ile okur). Fotoğraflar yalnız cihazda tutulur
+        // (teslim-foto ucu backend'de yok — §2.2, mock); ağ çağrısı yapılmaz.
+        composable(
+            route = RencarDestinations.RENTAL_RETURN_PHOTOS_ROUTE,
+            arguments = listOf(
+                navArgument(RencarDestinations.RENTAL_RETURN_PHOTOS_ARG_RENTAL_ID) {
+                    type = NavType.StringType
+                },
+                navArgument(RencarDestinations.RENTAL_RETURN_PHOTOS_ARG_VEHICLE_TITLE) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(RencarDestinations.RENTAL_RETURN_PHOTOS_ARG_VEHICLE_PLATE) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+            ),
+        ) {
+            RentalReturnPhotosScreen(
+                onNavigateBack = { navController.popBackStack() },
+                // 4 yön tamam → Ödeme ekranı. Foto ekranı geri yığından çıkar: ödemeden geri → Home.
+                onContinueToPayment = { rentalId ->
+                    navController.navigate(RencarDestinations.paymentRoute(rentalId)) {
+                        popUpTo(RencarDestinations.RENTAL_RETURN_PHOTOS_ROUTE) { inclusive = true }
                     }
                 },
             )
