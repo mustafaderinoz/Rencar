@@ -74,7 +74,8 @@ fun ReservationScreen(
     LaunchedEffect(uiState.reserved) {
         if (uiState.reserved) {
             Toast.makeText(context, "Araç $FreeReservationLabel için rezerve edildi.", Toast.LENGTH_SHORT).show()
-            onReserved(uiState.vehicle?.id.orEmpty(), uiState.selectedPlan)
+            // vehicleId state'ten alınır: kurtarmada araç REZERVE olup [vehicle] null olsa da taşınır.
+            onReserved(uiState.vehicleId, uiState.selectedPlan)
             viewModel.onIntent(ReservationIntent.ReservedHandled)
         }
     }
@@ -116,6 +117,18 @@ private fun ReservationScreen(
         val vehicle = uiState.vehicle
         when {
             vehicle == null && uiState.isLoading -> LoadingState(Modifier.weight(1f))
+
+            // Kurtarma: araç REZERVE olup 404 döndü ama aktif rezervasyon var → minimal görünüm.
+            vehicle == null && uiState.reservationRemaining != null -> {
+                RecoveryContent(uiState = uiState, modifier = Modifier.weight(1f))
+                BottomBar(
+                    canReserve = uiState.canReserve,
+                    isReserving = uiState.isReserving,
+                    label = "Devam Et",
+                    onReserve = { onIntent(ReservationIntent.ReserveClicked) },
+                )
+            }
+
             vehicle == null && uiState.errorMessage != null ->
                 ErrorState(
                     message = uiState.errorMessage,
@@ -132,6 +145,11 @@ private fun ReservationScreen(
                         .padding(horizontal = 20.dp)
                         .padding(top = 4.dp, bottom = 16.dp),
                 ) {
+                    // Aktif rezervasyon varsa (kurtarma/re-entry) üstte geri sayım banner'ı.
+                    uiState.reservationRemaining?.let {
+                        ReservationCountdownBanner(it)
+                        Spacer(Modifier.height(16.dp))
+                    }
                     VehicleCard(vehicle)
                     Spacer(Modifier.height(16.dp))
                     PlanCard(
@@ -164,6 +182,7 @@ private fun ReservationScreen(
                 BottomBar(
                     canReserve = uiState.canReserve,
                     isReserving = uiState.isReserving,
+                    label = if (uiState.hasActiveReservation) "Devam Et" else "Rezervasyonu Tamamla",
                     onReserve = { onIntent(ReservationIntent.ReserveClicked) },
                 )
             }
@@ -439,11 +458,12 @@ private fun TermsRow(checked: Boolean, onToggle: () -> Unit) {
     }
 }
 
-// ── Alt sabit buton: "Rezervasyonu Tamamla" ──
+// ── Alt sabit buton: "Rezervasyonu Tamamla" / "Devam Et" (aktif rezervasyon/kurtarma) ──
 @Composable
 private fun BottomBar(
     canReserve: Boolean,
     isReserving: Boolean,
+    label: String,
     onReserve: () -> Unit,
 ) {
     Column(
@@ -471,7 +491,73 @@ private fun BottomBar(
             if (isReserving) {
                 CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
             } else {
-                Text(text = "Rezervasyonu Tamamla", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(text = label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// ── Rezervasyon geri sayım banner'ı: 15 dk ücretsiz tutmanın kalanı (mm:ss) ──
+@Composable
+private fun ReservationCountdownBanner(remainingSeconds: Int) {
+    val timeLabel = "%02d:%02d".format(TrLocale, remainingSeconds / 60, remainingSeconds % 60)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(RencarBlue.copy(alpha = 0.10f))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Rezervasyonunuz aktif",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Ücretsiz tutma süresi",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = timeLabel,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = RencarBlue,
+        )
+    }
+}
+
+// ── Kurtarma görünümü: araç REZERVE olup 404 döndüğünde (yeniden açılış) minimal içerik ──
+@Composable
+private fun RecoveryContent(uiState: ReservationUiState, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp)
+            .padding(top = 8.dp, bottom = 16.dp),
+    ) {
+        uiState.reservationRemaining?.let { ReservationCountdownBanner(it) }
+        Spacer(Modifier.height(16.dp))
+        Card {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = uiState.recoveryVehicleLabel ?: "Rezerve ettiğiniz araç",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Rezervasyonunuz sürüyor. Süre dolmadan devam edip aracı kiralamaya " +
+                        "başlayabilirsiniz.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

@@ -13,6 +13,23 @@ data class RentalUi(
 )
 
 /**
+ * Devam eden (PREPARING veya ACTIVE) kiralama — foto akışını devralma ve yeniden açılışta kurtarma
+ * için gereken asgari alanlar. DTO: RentalResponse.
+ *
+ * Foto ekranına/aktif yolculuğa yönlendirme [vehicleId] + [plan] / [rentalId] ile yapılır; devralınan
+ * foto ekranının başlığı [vehicleTitle] / [vehiclePlate] ile doldurulur. [isActive] true → ACTIVE
+ * (Aktif Yolculuk ekranına kurtar), false → PREPARING (foto akışı devralınır).
+ */
+data class ResumableRentalUi(
+    val rentalId: String,
+    val vehicleId: String,
+    val plan: String,
+    val vehicleTitle: String,
+    val vehiclePlate: String,
+    val isActive: Boolean,
+)
+
+/**
  * Kiralamalarım (Geçmiş) listesindeki tek kart — UI/domain modeli. DTO: RentalResponse.
  *
  * Tüm etiketler ([dateLabel] "26 Haz 2026 · 14:32", [durationLabel] "24 dk", [distanceLabel] "12,4 km")

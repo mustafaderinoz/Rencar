@@ -60,6 +60,13 @@ interface RentalApi {
     ): RentalPhotosState
 
     /**
+     * PREPARING kiralamanın foto akışının anlık durumu (RentalController_getPhotos): yüklü yönler +
+     * eksik yönler + sayaç. Uygulama yeniden açıldığında yarım kalan foto akışı buradan devralınır.
+     */
+    @GET("rentals/{id}/photos")
+    suspend fun getPhotos(@Path("id") rentalId: String): RentalPhotosState
+
+    /**
      * PREPARING yolculuğu ACTIVE yapar (RentalController_start). 4 yönün tamamı yüklenmemişse
      * 409 (kalan sayıyla) döner; startedAt bu anda atılır (foto süresi faturalanmaz).
      */

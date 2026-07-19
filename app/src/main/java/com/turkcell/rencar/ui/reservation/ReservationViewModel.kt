@@ -13,6 +13,7 @@ import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,11 +45,14 @@ class ReservationViewModel @Inject constructor(
     private val vehicleId: String =
         savedStateHandle.get<String>(RencarDestinations.RESERVATION_ARG_VEHICLE_ID).orEmpty()
 
-    private val _uiState = MutableStateFlow(ReservationUiState())
+    private val _uiState = MutableStateFlow(ReservationUiState(vehicleId = vehicleId))
     val uiState: StateFlow<ReservationUiState> = _uiState.asStateFlow()
 
     // Plan hızlı değişince eski quote isteğini iptal etmek için son quote işi tutulur.
     private var quoteJob: Job? = null
+
+    // Aktif rezervasyonun geri sayımını süren yerel ticker (1 sn); yeni yüklemede/expiry'de iptal edilir.
+    private var countdownJob: Job? = null
 
     init {
         load()
@@ -75,19 +79,56 @@ class ReservationViewModel @Inject constructor(
     private fun load() {
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
+            // Aktif rezervasyon (varsa geri sayım + kurtarma etiketi) — araç yüklemesinden ÖNCE çekilir:
+            // araç REZERVE olduğunda GET /vehicles/{id} 404 döner ve bunu "hata" değil "kurtarma" saymalıyız.
+            loadActiveReservation()
             vehicleRepository.getVehicle(vehicleId)
                 .onSuccess { vehicle ->
                     _uiState.update { it.copy(isLoading = false, vehicle = vehicle) }
                     loadQuote(_uiState.value.selectedPlan)
                 }
                 .onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = e.toAppError().toUserMessage(ErrorContext.RESERVATION_LOAD),
-                        )
+                    // Aktif rezervasyon varsa araç REZERVE olduğundan 404 beklenir (openapi görünürlük
+                    // kuralı) → tam ekran hata DEĞİL, minimal kurtarma görünümü (geri sayım + "Devam Et").
+                    if (_uiState.value.hasActiveReservation) {
+                        _uiState.update { it.copy(isLoading = false) }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = e.toAppError().toUserMessage(ErrorContext.RESERVATION_LOAD),
+                            )
+                        }
                     }
                 }
+        }
+    }
+
+    /**
+     * GET /reservations/active: bu araca ait aktif rezervasyon varsa geri sayımı başlatır ve kurtarma
+     * etiketini (araç adı · plaka) doldurur. Aktif rezervasyon yoksa (404) sessizce geçilir.
+     */
+    private suspend fun loadActiveReservation() {
+        val reservation = reservationRepository.getActiveReservation().getOrNull() ?: return
+        if (reservation.vehicleId != vehicleId) return
+        _uiState.update {
+            it.copy(recoveryVehicleLabel = "${reservation.vehicleTitle} · ${reservation.vehiclePlate}")
+        }
+        startCountdown(reservation.remainingSeconds)
+    }
+
+    /** Kalan süreyi 1 sn'lik yerel sayaçla azaltır; 0'a inince geri sayım gizlenir (araç boşa çıkar). */
+    private fun startCountdown(seconds: Int) {
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
+            var remaining = seconds.coerceAtLeast(0)
+            _uiState.update { it.copy(reservationRemaining = remaining) }
+            while (remaining > 0) {
+                delay(1000)
+                remaining -= 1
+                _uiState.update { it.copy(reservationRemaining = remaining) }
+            }
+            _uiState.update { it.copy(reservationRemaining = null) }
         }
     }
 
@@ -129,22 +170,34 @@ class ReservationViewModel @Inject constructor(
 
         _uiState.update { it.copy(isReserving = true, errorMessage = null) }
         viewModelScope.launch {
-            reservationRepository.reserve(vehicleId)
-                .onSuccess {
-                    if (plan == RentalPlan.DAILY) {
-                        startDailyRental()
-                    } else {
-                        _uiState.update { it.copy(isReserving = false, reserved = true) }
+            if (state.hasActiveReservation) {
+                // Zaten aktif rezervasyon var (kurtarma/tekrar): yeni POST /reservations ATILMAZ (409
+                // "zaten aktif rezervasyonun var" döner — decisions.md); mevcut rezervasyonla devam edilir.
+                proceedAfterReservation(plan)
+            } else {
+                reservationRepository.reserve(vehicleId)
+                    .onSuccess { proceedAfterReservation(plan) }
+                    .onFailure { e ->
+                        _uiState.update {
+                            it.copy(
+                                isReserving = false,
+                                errorMessage = e.toAppError().toUserMessage(ErrorContext.RESERVATION_CREATE),
+                            )
+                        }
                     }
-                }
-                .onFailure { e ->
-                    _uiState.update {
-                        it.copy(
-                            isReserving = false,
-                            errorMessage = e.toAppError().toUserMessage(ErrorContext.RESERVATION_CREATE),
-                        )
-                    }
-                }
+            }
+        }
+    }
+
+    /**
+     * Rezervasyon hazır (yeni açıldı veya zaten aktifti) → plana göre ilerle: Günlük planda kiralamayı
+     * burada açar (foto adımı yok), diğer planlarda foto ekranına geçiş bayrağını ([reserved]) verir.
+     */
+    private suspend fun proceedAfterReservation(plan: RentalPlan) {
+        if (plan == RentalPlan.DAILY) {
+            startDailyRental()
+        } else {
+            _uiState.update { it.copy(isReserving = false, reserved = true) }
         }
     }
 

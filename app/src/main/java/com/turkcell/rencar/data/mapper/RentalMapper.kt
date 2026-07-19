@@ -6,6 +6,7 @@ import com.turkcell.rencar.data.model.RentalPhotosUi
 import com.turkcell.rencar.data.model.RentalReceiptUi
 import com.turkcell.rencar.data.model.RentalStatsUi
 import com.turkcell.rencar.data.model.RentalUi
+import com.turkcell.rencar.data.model.ResumableRentalUi
 import com.turkcell.rencar.data.remote.dto.ActiveRentalResponse
 import com.turkcell.rencar.data.remote.dto.FinishRentalResponse
 import com.turkcell.rencar.data.remote.dto.RentalPhotosState
@@ -53,6 +54,19 @@ fun RentalPhotosState.toUi(): RentalPhotosUi = RentalPhotosUi(
     uploadedSides = photos.map { it.side },
     uploadedCount = uploadedCount,
     photosComplete = photosComplete,
+)
+
+/**
+ * Devam eden kiralama DTO → devralma/kurtarma modeli. [isActive] durumdan türetilir (ACTIVE → true;
+ * PREPARING → false). Araç başlığı ("Marka Model") burada oluşturulur (foto devralma ekranı başlığı).
+ */
+fun RentalResponse.toResumableUi(): ResumableRentalUi = ResumableRentalUi(
+    rentalId = id,
+    vehicleId = vehicleId,
+    plan = plan,
+    vehicleTitle = "${vehicle.brand} ${vehicle.model}",
+    vehiclePlate = vehicle.plate,
+    isActive = status.equals("ACTIVE", ignoreCase = true),
 )
 
 fun ActiveRentalResponse.toUi(): ActiveRentalUi = ActiveRentalUi(

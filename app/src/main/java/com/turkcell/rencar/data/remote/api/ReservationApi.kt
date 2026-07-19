@@ -35,4 +35,12 @@ interface ReservationApi {
      */
     @POST("reservations")
     suspend fun create(@Body body: CreateReservationRequest): ReservationResponse
+
+    /**
+     * Giriş yapan müşterinin aktif rezervasyonu (ReservationController_getActive) — kalan saniyeyle.
+     * Süresi geçmiş rezervasyon bu çağrıda EXPIRED işlenir ve API 404 döner (aktif rezervasyon yok).
+     * Yeniden açılışta rezervasyon kurtarma ve rezervasyon ekranındaki geri sayım bu uçtan beslenir.
+     */
+    @GET("reservations/active")
+    suspend fun getActive(): ReservationResponse
 }

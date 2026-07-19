@@ -1,6 +1,7 @@
 package com.turkcell.rencar.data.repository
 
 import com.turkcell.rencar.data.mapper.toHistoryItem
+import com.turkcell.rencar.data.mapper.toResumableUi
 import com.turkcell.rencar.data.mapper.toUi
 import com.turkcell.rencar.data.model.ActiveRentalUi
 import com.turkcell.rencar.data.model.RentalHistoryItemUi
@@ -8,6 +9,7 @@ import com.turkcell.rencar.data.model.RentalPhotosUi
 import com.turkcell.rencar.data.model.RentalReceiptUi
 import com.turkcell.rencar.data.model.RentalStatsUi
 import com.turkcell.rencar.data.model.RentalUi
+import com.turkcell.rencar.data.model.ResumableRentalUi
 import com.turkcell.rencar.data.model.VehiclePoint
 import com.turkcell.rencar.data.remote.api.RentalApi
 import com.turkcell.rencar.data.remote.dto.CreateRentalRequest
@@ -84,6 +86,37 @@ class RentalRepository @Inject constructor(
             val sidePart = MultipartBody.Part.createFormData("side", side)
             val filePart = file.toImagePart(field = "file", uploadName = "$side-upload.jpg")
             rentalApi.uploadPhoto(rentalId, sidePart, filePart).toUi()
+        }
+
+    /**
+     * GET /rentals/{id}/photos: PREPARING kiralamanın foto akışının anlık durumu (yüklü yönler +
+     * sayaç). Uygulama yeniden açıldığında yarım kalan akışı devralmak için kullanılır; hata Result'a taşınır.
+     */
+    suspend fun getPhotos(rentalId: String): Result<RentalPhotosUi> =
+        runCatching { rentalApi.getPhotos(rentalId).toUi() }
+
+    /**
+     * Kullanıcının açık (PREPARING) kiralamasını bulur — varsa foto ekranı yeni kiralama açmak yerine
+     * akışı buradan devralır. Aynı anda en fazla bir aktif kiralama olabildiğinden ilk PREPARING kayıt
+     * döndürülür; yoksa null. Liste alınamazsa hata Result olarak taşınır (çağıran null gibi ele alır).
+     */
+    suspend fun findPreparingRental(): Result<ResumableRentalUi?> =
+        runCatching {
+            rentalApi.listMine().firstOrNull { it.status.equals("PREPARING", ignoreCase = true) }
+                ?.toResumableUi()
+        }
+
+    /**
+     * Yeniden açılışta kurtarılacak devam eden kiralamayı bulur: önce ACTIVE (Aktif Yolculuk),
+     * yoksa PREPARING (foto devralma). Tek listMine çağrısıyla ikisi de değerlendirilir; hiçbiri
+     * yoksa null. Liste alınamazsa hata Result olarak taşınır (Splash kurtarmayı atlar, Home'a düşer).
+     */
+    suspend fun findResumableRental(): Result<ResumableRentalUi?> =
+        runCatching {
+            val rentals = rentalApi.listMine()
+            val target = rentals.firstOrNull { it.status.equals("ACTIVE", ignoreCase = true) }
+                ?: rentals.firstOrNull { it.status.equals("PREPARING", ignoreCase = true) }
+            target?.toResumableUi()
         }
 
     /**

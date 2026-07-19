@@ -74,11 +74,19 @@ fun RencarNavHost(
             SplashScreen(
                 onDestinationResolved = { destination ->
                     val route = when (destination) {
-                        SplashDestination.ONBOARDING -> RencarDestinations.ONBOARDING
-                        SplashDestination.LOGIN -> RencarDestinations.LOGIN
-                        SplashDestination.HOME -> RencarDestinations.HOME
-                        SplashDestination.LICENSE_UPLOAD -> RencarDestinations.LICENSE
-                        SplashDestination.LICENSE_PENDING -> RencarDestinations.LICENSE_PENDING
+                        SplashDestination.Onboarding -> RencarDestinations.ONBOARDING
+                        SplashDestination.Login -> RencarDestinations.LOGIN
+                        SplashDestination.Home -> RencarDestinations.HOME
+                        SplashDestination.LicenseUpload -> RencarDestinations.LICENSE
+                        SplashDestination.LicensePending -> RencarDestinations.LICENSE_PENDING
+                        // Yeniden açılış kurtarma: devam eden akışın ekranına doğrudan inilir (Splash
+                        // backstack'ten çıkar). Akış bittiğinde (bitir → ödeme → Home) yığın Home'a döner.
+                        is SplashDestination.ActiveRental ->
+                            RencarDestinations.activeRentalRoute(destination.rentalId)
+                        is SplashDestination.PreparingRental ->
+                            RencarDestinations.rentalPhotosRoute(destination.vehicleId, destination.plan)
+                        is SplashDestination.ActiveReservation ->
+                            RencarDestinations.reservationRoute(destination.vehicleId)
                     }
                     navController.navigate(route) {
                         popUpTo(RencarDestinations.SPLASH) { inclusive = true }

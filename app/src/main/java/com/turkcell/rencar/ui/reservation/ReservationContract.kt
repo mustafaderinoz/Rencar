@@ -16,8 +16,14 @@ import com.turkcell.rencar.data.model.VehicleUi
 data class ReservationUiState(
     /** GET /vehicles/{id} yükleniyor (ilk açılış). */
     val isLoading: Boolean = false,
-    /** Araç kartı verisi; null iken yükleniyor/hata gösterilir. */
+    /** Araç kartı verisi; null iken yükleniyor/hata/kurtarma gösterilir. */
     val vehicle: VehicleUi? = null,
+    /**
+     * Rezerve/kurtarma navigasyonu için araç kimliği (ViewModel'in path argümanı). Yeniden açılış
+     * kurtarmasında araç REZERVE olduğundan GET /vehicles/{id} 404 döner ([vehicle] null kalır); foto
+     * ekranına geçiş kimliği yine de buradan taşınır.
+     */
+    val vehicleId: String = "",
     /** Seçili kiralama planı (plan çipleri). Varsayılan: Dakikalık. */
     val selectedPlan: RentalPlan = RentalPlan.PER_MINUTE,
     /** Seçili plana ait fiyat önizleme (GET /vehicles/{id}/quote); yükleniyorken/hata null olur. */
@@ -41,15 +47,36 @@ data class ReservationUiState(
      * sinyali). Günlük planda foto adımı yoktur; API kaydı anında ACTIVE yapar.
      */
     val startedRentalId: String? = null,
+    /**
+     * Aktif rezervasyonun (15 dk ücretsiz tutma) kalan süresi (sn); null iken aktif rezervasyon yok ve
+     * geri sayım gösterilmez. GET /reservations/active'ten alınıp 1 sn'lik yerel sayaçla azalır (Aktif
+     * Yolculuk sayacındaki resync kalıbıyla aynı). 0'a ininde tekrar null olur (araç sunucuda boşa çıkar).
+     */
+    val reservationRemaining: Int? = null,
+    /**
+     * Kurtarma görünümünün araç etiketi ("Renault Clio · 34 RNC 022") — araç REZERVE olup 404 döndüğünde
+     * ([vehicle] null) minimal kart bunu aktif rezervasyonun araç özetinden gösterir; aksi halde null.
+     */
+    val recoveryVehicleLabel: String? = null,
     /** Yükleme/rezervasyon hata mesajı (yoksa null). */
     val errorMessage: String? = null,
 ) {
     /** Araç kiralanabilir mi (yalnızca AVAILABLE). Butonun temel koşulu. */
     val isAvailable: Boolean get() = vehicle?.status == "AVAILABLE"
 
-    /** "Rezervasyonu Tamamla" aktif mi: araç müsait + şartlar onaylı + başka işlem sürmüyor. */
+    /** Bu araç için aktif rezervasyon var mı (geri sayım gösterilir; buton "Devam Et" olur). */
+    val hasActiveReservation: Boolean get() = reservationRemaining != null
+
+    /**
+     * Alt buton aktif mi. Aktif rezervasyon varsa (kurtarma/tekrar) yeni rezervasyon açılmaz, doğrudan
+     * devam edilir — bu yüzden müsaitlik/şart koşulu aranmaz; aksi halde araç müsait + şartlar onaylı olmalı.
+     */
     val canReserve: Boolean
-        get() = isAvailable && termsAccepted && !isReserving && !isLoading
+        get() = if (hasActiveReservation) {
+            !isReserving && !isLoading
+        } else {
+            isAvailable && termsAccepted && !isReserving && !isLoading
+        }
 }
 
 /**

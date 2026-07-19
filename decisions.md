@@ -608,3 +608,31 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan dosyalar:** `ui/login/*`, `ui/otp/*`, `ui/register/*`, `ui/license/*`, `ui/splash/*`, `ui/rentalphotos/*`, `ui/reservation/*` (her biri Contract+ViewModel+Screen), `ui/map/{MapContract,MapViewModel,MapScreen}`.
 
 - Not (19.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Denetim grep ile tekrarlandı: `onIntent` dışında public VM fonksiyonu YOK, stateless gövdelerde navigasyon callback'i YOK. Emülatör/cihaz doğrulaması yapılmadı.
+
+---
+
+### Foto Akışı Devralma + Rezervasyon Geri Sayımı/Kurtarma — `GET /rentals/{id}/photos`, `GET /reservations/active`
+
+- Seçim: **Bağlanmamış iki müşteri ucu bağlandı ve tükettikleri UI/akış eklendi.** (1) **`GET /rentals/{id}/photos`** — foto ekranı açılışında kullanıcının açık PREPARING kiralaması varsa yeni açmak yerine akış DEVRALINIR (yüklü yönler/sayaç geri yüklenir). (2) **`GET /reservations/active`** — rezervasyon ekranında 15 dk ücretsiz tutmanın kalanı geri sayımla gösterilir; ayrıca yeniden açılışta CUSTOMER'ın devam eden akışı (ACTIVE kiralama / PREPARING foto / aktif rezervasyon) Splash'te kurtarılır.
+
+- Son Güncelleme Tarihi: 20.07.2026
+
+- Sebep: `docs/api/openapi.json`'da bu iki müşteri ucunun istemcisi yoktu (denetimle bulundu). Foto devralma openapi resume sözleşmesinin ("uygulama yeniden açıldığında yarım kalan akış buradan devralınır") karşılığıdır; rezervasyon geri sayımı 15 dk ücretsiz tutmanın kalanını gösterir. Yeniden açılış kurtarması, mevcut `SPLASH` oturum-geri-yükleme kalıbının doğal uzantısıdır (aynı "çöz → popUpTo(SPLASH, inclusive) ile geç" deseni).
+
+- **Kritik kontrat notu (§2.2 — kullanıcıyla netleştirildi):** 15 dk sayaç **rezervasyona** aittir, kiralamaya değil. `POST /rentals` foto ekranına girer girmez rezervasyonu **CONVERTED** yapar (araç RESERVED→RENTED, kiralama PREPARING); dolayısıyla foto aşamasında `GET /reservations/active` **404** döner ve PREPARING'in sunucu-tarafı sayacı yoktur. Bu yüzden "foto sırasında sayacı sürdür" yerine sayaç yalnız **rezervasyon aşamasında** gösterilir. İlk yanlış-anlaşılan "foto sırasında 15 dk aksın" isteği bu contract ışığında kullanıcı tarafından geri çekildi.
+
+- **Kararlar/sapmalar:**
+  - **DTO izolasyonu korunur ("Katman Derinliği"):** yeni `ReservationUi` + `ResumableRentalUi` (data/model), dönüşümler mapper katmanında (`ReservationResponse.toUi`, `RentalResponse.toResumableUi`); `ui/` içinde `data.remote.dto` importu yoktur.
+  - **Kurtarma — araç görünürlük kısıtı:** `GET /vehicles/{id}` REZERVE aracı sahibine bile **404** döndürür (yalnız AVAILABLE veya aktif KİRALAMASI olana görünür — openapi). Bu yüzden yeniden açılışta rezervasyon ekranı aracı yükleyemez; `ReservationViewModel` bunu **hata değil kurtarma** sayar ve `GET /reservations/active`'in araç özetinden **minimal kurtarma görünümü** (geri sayım + "Devam Et") gösterir. Tam araç kartı/plan seçimi yalnız araç yüklenebildiğinde çıkar; minimal görünümde plan varsayılan (Dakikalık) kalır.
+  - **409 retry düzeltmesi:** aktif rezervasyon varken alt buton "Devam Et" olur ve `POST /reservations` **atılmaz** (aksi halde "zaten aktif rezervasyonun var" 409'u gelirdi — bkz. "Günlük Kiralama" kararındaki askıda-rezervasyon notu); doğrudan foto akışına/DAILY kiralamaya geçilir.
+  - **Geri sayım = yerel ticker:** `remainingSeconds` sunucu gerçeği; ekran 1 sn'lik yerel sayaçla azaltır (Aktif Yolculuk resync kalıbıyla aynı), 0'da gizlenir. Foto aşamasında poll YOKTUR (uç 404).
+  - **Foto devralma yalnız süreç-ölümü içindir:** ekrandan bilerek **geri** çıkış hâlâ PREPARING'i iptal eder (`onCleared`); yalnız beklenmedik kapanışta (onCleared çalışmaz) kiralama sunucuda kalır ve açılışta devralınır. Normal rezervasyon→foto akışında henüz PREPARING olmadığından `findPreparingRental` null döner → eski davranış (yeni `POST /rentals`).
+  - **`SplashDestination` enum → sealed interface:** kurtarma hedefleri kimlik taşıdığından (rentalId / vehicleId+plan) sealed'e çevrildi; NavHost route'u bu alanlardan üretir. Kurtarma **Splash'e özeldir**, `OtpVerificationViewModel.resolveDestination`'a replike EDİLMEDİ (giriş sonrası kullanıcı zaten ilgili ekrandan gelir). PENDING/ehliyet kuralı iki VM'de aynı kalır.
+  - **Kurtarma sırası:** ACTIVE kiralama → Aktif Yolculuk; PREPARING → Foto (devralma); aktif rezervasyon → Rezervasyon (geri sayım). Tek `listMine` çağrısıyla ACTIVE/PREPARING değerlendirilir; ağ/404'te sessizce Home'a düşülür (açılış bloklanmaz).
+  - **Rezervasyon iptali (`DELETE /reservations/{id}`) KAPSAM DIŞI** — kullanıcı "sonra" dedi; minimal kurtarma görünümünde yalnız "Devam Et" var, "İptal" ayrı iş.
+
+- **Yeni bağımlılık YOK.** Mevcut Retrofit + kotlinx.serialization + Hilt + Compose yeterli; DI değişmedi (mevcut arayüzlere metot eklendi).
+
+- **Dokunulan/eklenen dosyalar:** yeni `data/model/ReservationUi`; güncellenen `data/remote/api/{ReservationApi,RentalApi}` (getActive/getPhotos), `data/mapper/{ReservationMapper,RentalMapper}` (toUi/toResumableUi), `data/model/RentalUi` (ResumableRentalUi), `data/repository/{ReservationRepository,RentalRepository}` (getActiveReservation/getPhotos/findPreparingRental/findResumableRental), `ui/rentalphotos/RentalPhotosViewModel` (resumeOrCreate), `ui/reservation/{ReservationContract,ReservationViewModel,ReservationScreen}` (geri sayım + kurtarma görünümü + "Devam Et"), `ui/splash/{SplashContract,SplashViewModel}` (sealed hedef + kurtarma), `ui/navigation/RencarNavHost` (kurtarma route eşlemesi).
+
+- Not (20.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` + `:app:assembleDebug` başarılı.** Emülatör/cihaz doğrulaması yapılmadı (kurtarma senaryoları CUSTOMER hesabı + aktif rezervasyon/kiralama state'i gerektirir).

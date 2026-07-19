@@ -17,12 +17,30 @@ data class SplashUiState(
 
 /**
  * Açılışta çözülen ilk hedef.
- * - [ONBOARDING]: saklı token yok (ilk açılış veya çıkış yapılmış).
- * - [LOGIN]: token vardı ama oturum geçersiz (refresh de başarısız) → temizlendi, yeniden giriş gerek.
- * - [HOME] / [LICENSE_UPLOAD] / [LICENSE_PENDING]: geçerli oturum; rol + ehliyet durumuna göre
+ * - [Onboarding]: saklı token yok (ilk açılış veya çıkış yapılmış).
+ * - [Login]: token vardı ama oturum geçersiz (refresh de başarısız) → temizlendi, yeniden giriş gerek.
+ * - [Home] / [LicenseUpload] / [LicensePending]: geçerli oturum; rol + ehliyet durumuna göre
  *   (OTP sonrası yönlendirmeyle aynı kural — bkz. SplashViewModel.resolveDestination).
+ * - [ActiveRental] / [PreparingRental] / [ActiveReservation]: CUSTOMER'da devam eden akış kurtarma
+ *   (yeniden açılış). Ekrana taşınacak kimlikler (rentalId / vehicleId + plan) case'te tutulur — bu
+ *   yüzden enum değil sealed; NavHost route'u bu alanlardan üretir.
  */
-enum class SplashDestination { ONBOARDING, LOGIN, HOME, LICENSE_UPLOAD, LICENSE_PENDING }
+sealed interface SplashDestination {
+    data object Onboarding : SplashDestination
+    data object Login : SplashDestination
+    data object Home : SplashDestination
+    data object LicenseUpload : SplashDestination
+    data object LicensePending : SplashDestination
+
+    /** Devam eden ACTIVE kiralama → Aktif Yolculuk ekranı. */
+    data class ActiveRental(val rentalId: String) : SplashDestination
+
+    /** Yarım kalan PREPARING kiralama → Foto ekranı (akış devralınır, GET /rentals/{id}/photos). */
+    data class PreparingRental(val vehicleId: String, val plan: String) : SplashDestination
+
+    /** Aktif rezervasyon → Rezervasyon ekranı (geri sayım + "Devam Et" kurtarma görünümü). */
+    data class ActiveReservation(val vehicleId: String) : SplashDestination
+}
 
 /** Kullanıcı aksiyonları (§4.3). */
 sealed interface SplashIntent {

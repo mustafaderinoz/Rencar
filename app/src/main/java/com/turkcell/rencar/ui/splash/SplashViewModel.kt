@@ -6,6 +6,8 @@ import com.turkcell.rencar.data.local.TokenStore
 import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.data.repository.LicenseRepository
+import com.turkcell.rencar.data.repository.RentalRepository
+import com.turkcell.rencar.data.repository.ReservationRepository
 import com.turkcell.rencar.util.isUnauthorized
 import com.turkcell.rencar.util.toAppError
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +31,8 @@ class SplashViewModel @Inject constructor(
     private val tokenStore: TokenStore,
     private val authRepository: AuthRepository,
     private val licenseRepository: LicenseRepository,
+    private val rentalRepository: RentalRepository,
+    private val reservationRepository: ReservationRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SplashUiState())
@@ -49,10 +53,10 @@ class SplashViewModel @Inject constructor(
 
     /**
      * Oturum geri-yükleme akışı:
-     * - Saklı access token yok → [SplashDestination.ONBOARDING].
+     * - Saklı access token yok → [SplashDestination.Onboarding].
      * - Token var → `GET /auth/me` (gerekiyorsa TokenAuthenticator refresh'i devreye girer):
      *   - başarılı → rol/ehliyet durumuna göre [resolveDestination].
-     *   - 401 → refresh de başarısız; SessionManager token'ları temizledi → [SplashDestination.LOGIN].
+     *   - 401 → refresh de başarısız; SessionManager token'ları temizledi → [SplashDestination.Login].
      *   - ağ/bilinmeyen hata → oturum doğrulanamadı; tahmin yürütmeden (§2.2) tekrar-dene ekranı.
      */
     private fun restoreSession() {
@@ -60,14 +64,14 @@ class SplashViewModel @Inject constructor(
         viewModelScope.launch {
             val token = tokenStore.currentAccessToken()
             if (token.isNullOrBlank()) {
-                emit(SplashDestination.ONBOARDING)
+                emit(SplashDestination.Onboarding)
                 return@launch
             }
             authRepository.me()
                 .onSuccess { user -> emit(resolveDestination(user.role)) }
                 .onFailure { e ->
                     if (e.toAppError().isUnauthorized) {
-                        emit(SplashDestination.LOGIN)
+                        emit(SplashDestination.Login)
                     } else {
                         _uiState.update { it.copy(isLoading = false, isError = true) }
                     }
@@ -76,18 +80,46 @@ class SplashViewModel @Inject constructor(
     }
 
     /**
-     * Geçerli oturumda iniş hedefi. **OtpVerificationViewModel.resolveDestination ile AYNI kural**
-     * (ikisi birlikte güncel tutulmalı): onaylı roller (CUSTOMER/ADMIN) → HOME. PENDING'de
-     * `GET /license/status`: UNDER_REVIEW → LICENSE_PENDING, APPROVED → HOME, diğer/bilinmez →
-     * LICENSE_UPLOAD (durum alınamazsa güvenli varsayılan: ehliyet yükleme).
+     * Geçerli oturumda iniş hedefi. PENDING/ehliyet kuralı **OtpVerificationViewModel.resolveDestination
+     * ile AYNIdır** (ikisi birlikte güncel tutulmalı): PENDING'de `GET /license/status`: UNDER_REVIEW →
+     * LicensePending, APPROVED → Home, diğer/bilinmez → LicenseUpload. Onaylı rollerde HOME döner.
+     *
+     * **Splash'e ÖZEL (Otp'de yok):** CUSTOMER için Home'dan önce yeniden açılış kurtarması yapılır
+     * (aktif yolculuk / yarım foto akışı / aktif rezervasyon). Bu, açılışa özgü bir davranıştır; giriş
+     * sonrası (Otp) akışta kullanıcı zaten ilgili ekrandan gelir, o yüzden orada replike EDİLMEZ.
      */
     private suspend fun resolveDestination(role: String): SplashDestination {
-        if (role != "PENDING") return SplashDestination.HOME
-        return when (licenseRepository.getStatus().getOrNull()) {
-            LicenseVerificationStatus.UNDER_REVIEW -> SplashDestination.LICENSE_PENDING
-            LicenseVerificationStatus.APPROVED -> SplashDestination.HOME
-            else -> SplashDestination.LICENSE_UPLOAD
+        if (role == "PENDING") {
+            return when (licenseRepository.getStatus().getOrNull()) {
+                LicenseVerificationStatus.UNDER_REVIEW -> SplashDestination.LicensePending
+                LicenseVerificationStatus.APPROVED -> SplashDestination.Home
+                else -> SplashDestination.LicenseUpload
+            }
         }
+        // ADMIN'in kiralaması yoktur → doğrudan Home; CUSTOMER'da devam eden akış varsa oraya kurtar.
+        if (role == "CUSTOMER") {
+            resolveActiveFlow()?.let { return it }
+        }
+        return SplashDestination.Home
+    }
+
+    /**
+     * CUSTOMER için yeniden açılışta devam eden akış kurtarma: önce kiralama (ACTIVE → Aktif Yolculuk,
+     * PREPARING → Foto devralma), sonra aktif rezervasyon (→ Rezervasyon ekranı, geri sayım). Ağ/404
+     * hatalarında sessizce null döner ve Home'a düşülür (kurtarma zorunlu değildir, açılışı bloklamaz).
+     */
+    private suspend fun resolveActiveFlow(): SplashDestination? {
+        rentalRepository.findResumableRental().getOrNull()?.let { rental ->
+            return if (rental.isActive) {
+                SplashDestination.ActiveRental(rental.rentalId)
+            } else {
+                SplashDestination.PreparingRental(rental.vehicleId, rental.plan)
+            }
+        }
+        reservationRepository.getActiveReservation().getOrNull()?.let { reservation ->
+            return SplashDestination.ActiveReservation(reservation.vehicleId)
+        }
+        return null
     }
 
     private fun emit(destination: SplashDestination) {

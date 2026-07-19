@@ -2,6 +2,7 @@ package com.turkcell.rencar.data.repository
 
 import com.turkcell.rencar.data.mapper.toUi
 import com.turkcell.rencar.data.model.QuoteUi
+import com.turkcell.rencar.data.model.ReservationUi
 import com.turkcell.rencar.data.remote.api.ReservationApi
 import com.turkcell.rencar.data.remote.dto.CreateReservationRequest
 import javax.inject.Inject
@@ -31,4 +32,12 @@ class ReservationRepository @Inject constructor(
      */
     suspend fun reserve(vehicleId: String): Result<Unit> =
         runCatching { reservationApi.create(CreateReservationRequest(vehicleId)) }.map { }
+
+    /**
+     * GET /reservations/active: giriş yapan müşterinin aktif rezervasyonu (kalan süreyle). Aktif
+     * rezervasyon yoksa (veya süresi bu çağrıda EXPIRED işlenmişse) API 404 döner; hata Result olarak
+     * çağırana taşınır — çağıran bunu "aktif rezervasyon yok" olarak yorumlar (geri sayım gösterilmez).
+     */
+    suspend fun getActiveReservation(): Result<ReservationUi> =
+        runCatching { reservationApi.getActive().toUi() }
 }

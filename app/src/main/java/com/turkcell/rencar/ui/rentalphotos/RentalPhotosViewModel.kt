@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.model.RentalPhotosUi
+import com.turkcell.rencar.data.model.ResumableRentalUi
 import com.turkcell.rencar.data.repository.RentalRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
 import com.turkcell.rencar.util.ErrorContext
@@ -48,7 +49,7 @@ class RentalPhotosViewModel @Inject constructor(
     private var startConfirmed = false
 
     init {
-        createRental()
+        resumeOrCreate()
     }
 
     /**
@@ -64,7 +65,7 @@ class RentalPhotosViewModel @Inject constructor(
 
     fun onIntent(intent: RentalPhotosIntent) {
         when (intent) {
-            RentalPhotosIntent.Retry -> createRental()
+            RentalPhotosIntent.Retry -> resumeOrCreate()
             is RentalPhotosIntent.PhotoCaptured -> uploadPhoto(intent.side, intent.path)
             RentalPhotosIntent.StartClicked -> startRental()
             // Navigasyon Screen katmanında ele alınır (§4.6).
@@ -98,6 +99,47 @@ class RentalPhotosViewModel @Inject constructor(
                     }
                 }
         }
+    }
+
+    /**
+     * Açılış/tekrar-dene: kullanıcının açık (PREPARING) kiralaması varsa yeni açmak yerine foto
+     * akışını DEVRALIR (GET /rentals/{id}/photos ile yüklü yönler geri yüklenir); yoksa yeni PREPARING
+     * kiralama açar (POST /rentals). Uygulama beklenmedik kapanıp açıldığında yarım kalan akış buradan
+     * sürer (openapi resume sözleşmesi). Ekrandan bilerek geri çıkış hâlâ [onCleared] ile iptal eder.
+     */
+    private fun resumeOrCreate() {
+        _uiState.update { it.copy(isCreating = true, createError = null) }
+        viewModelScope.launch {
+            val preparing = rentalRepository.findPreparingRental().getOrNull()
+            if (preparing != null) {
+                resumeRental(preparing)
+            } else {
+                createRental()
+            }
+        }
+    }
+
+    /**
+     * Açık PREPARING kiralamayı devralır: kimlik + araç başlığı state'e alınır, foto durumu (yüklü
+     * yönler/sayaç) GET /rentals/{id}/photos ile geri yüklenir. Foto durumu alınamazsa akış yine
+     * sürdürülür (eksik yönler tekrar çekilebilir). Yerel önizleme yolları olmadığından devralınan
+     * yönler yalnız yeşil rozetle gösterilir (SideCell [RentalPhotosUiState.uploadedSides]'a bakar).
+     */
+    private suspend fun resumeRental(preparing: ResumableRentalUi) {
+        _uiState.update {
+            it.copy(
+                rentalId = preparing.rentalId,
+                vehicleTitle = preparing.vehicleTitle,
+                vehiclePlate = preparing.vehiclePlate,
+            )
+        }
+        rentalRepository.getPhotos(preparing.rentalId)
+            .onSuccess { photosState ->
+                _uiState.update { it.applyPhotosState(photosState).copy(isCreating = false) }
+            }
+            .onFailure {
+                _uiState.update { it.copy(isCreating = false) }
+            }
     }
 
     /** POST /rentals: PREPARING kiralamayı açar; başlık için araç özetini state'e alır. */
