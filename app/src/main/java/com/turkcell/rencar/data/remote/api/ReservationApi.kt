@@ -3,7 +3,9 @@ package com.turkcell.rencar.data.remote.api
 import com.turkcell.rencar.data.remote.dto.CreateReservationRequest
 import com.turkcell.rencar.data.remote.dto.QuoteResponse
 import com.turkcell.rencar.data.remote.dto.ReservationResponse
+import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -43,4 +45,13 @@ interface ReservationApi {
      */
     @GET("reservations/active")
     suspend fun getActive(): ReservationResponse
+
+    /**
+     * Aktif rezervasyonu iptal eder (ReservationController_cancel, 204); araç anında AVAILABLE olur.
+     * Rezervasyon size ait değilse 403, yoksa 404, zaten aktif değilse veya süresi dolmuşsa 409.
+     * Gövdesiz (204) yanıt olduğu için [Response] ile alınır (RentalApi.cancel ile aynı kalıp);
+     * çağıran isSuccessful değilse HttpException fırlatır (mesaj eşlemesi ViewModel'de).
+     */
+    @DELETE("reservations/{id}")
+    suspend fun cancel(@Path("id") reservationId: String): Response<Unit>
 }

@@ -3,17 +3,19 @@ package com.turkcell.rencar.ui.rentalphotos
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.turkcell.rencar.data.model.RentalPhotosUi
 import com.turkcell.rencar.data.model.ResumableRentalUi
 import com.turkcell.rencar.data.repository.RentalRepository
+import com.turkcell.rencar.data.repository.ReservationRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
+import com.turkcell.rencar.util.AppError
 import com.turkcell.rencar.util.ErrorContext
 import com.turkcell.rencar.util.toAppError
 import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
 import javax.inject.Inject
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,9 +25,17 @@ import kotlinx.coroutines.launch
 /**
  * Araç durumu (kiralama öncesi fotoğraf) ekranının tek durum kaynağı (§4.4).
  *
- * Rezervasyondan iletilen vehicleId + plan path argümanlarını [SavedStateHandle] ile okur;
- * açılışta POST /rentals ile kiralamayı PREPARING oluşturur. Her yön çekildiğinde
- * POST /rentals/{id}/photos çağrılır; sayaç/kalan yönler API cevabından güncellenir.
+ * AKIŞ (decisions.md → "Rezervasyon → Foto → Başlat"): açılışta kiralama OLUŞTURULMAZ.
+ * - **Normal mod:** GET /reservations/active ile aktif rezervasyonun 15 dk geri sayımı gösterilir;
+ *   çekilen kareler yerelde tutulur. Rezervasyon "Başlat"a dek AKTİF kalır.
+ * - **Kurtarma modu:** "Başlat" ortasında oluşmuş (ya da uygulama ölünce askıda kalmış) bir PREPARING
+ *   kiralama varsa (rezervasyon o noktada CONVERTED) onu devralır; foto durumu sunucudan yüklenir.
+ *
+ * "Kiralamayı Başlat" zinciri: POST /rentals (rezervasyon CONVERTED) → yüklenmemiş kareler
+ * POST /rentals/{id}/photos → POST /rentals/{id}/start. Zincir ortasında hata olursa kimlik/ilerleme
+ * korunur; kullanıcı tekrar basınca kaldığı yerden sürer. "Rezervasyonu İptal Et" rezervasyonu
+ * (veya oluşmuş kiralamayı) iptal eder; geri çıkış İPTAL ETMEZ (rezervasyon 15 dk / TTL sürer).
+ *
  * Android API'lerine (kamera/FileProvider) dokunmaz; ekran çekim yapıp yolu intent ile iletir.
  * Ayrı domain/UseCase katmanı yoktur (decisions.md).
  */
@@ -33,178 +43,225 @@ import kotlinx.coroutines.launch
 class RentalPhotosViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val rentalRepository: RentalRepository,
-    private val appScope: CoroutineScope,
+    private val reservationRepository: ReservationRepository,
 ) : ViewModel() {
 
-    private val vehicleId: String =
-        savedStateHandle.get<String>(RencarDestinations.RENTAL_PHOTOS_ARG_VEHICLE_ID).orEmpty()
     private val plan: String =
         savedStateHandle.get<String>(RencarDestinations.RENTAL_PHOTOS_ARG_PLAN).orEmpty()
+
+    // "Başlat"ta POST /rentals için kullanılacak araç kimliği: rezervasyon/kurtarma yüklenince onun
+    // aracıyla doldurulur (path argümanı yalnız yedek). Böylece 409 "rezervasyon yok" riskleri azalır.
+    private var startVehicleId: String =
+        savedStateHandle.get<String>(RencarDestinations.RENTAL_PHOTOS_ARG_VEHICLE_ID).orEmpty()
 
     private val _uiState = MutableStateFlow(RentalPhotosUiState())
     val uiState: StateFlow<RentalPhotosUiState> = _uiState.asStateFlow()
 
-    // Yolculuk başlatıldıysa (POST /rentals/{id}/start başarılı) true; ekrandan çıkarken kiralama
-    // korunur. Aksi halde (geri/sistem geri) onCleared PREPARING kiralamayı iptal eder.
-    private var startConfirmed = false
+    // Aktif rezervasyonun geri sayımını süren yerel ticker (1 sn); yeni yüklemede/başlatmada iptal edilir.
+    private var countdownJob: Job? = null
 
     init {
-        resumeOrCreate()
-    }
-
-    /**
-     * Ekran kapanırken (geri/sistem geri) başlatılmamış PREPARING kiralamayı iptal eder.
-     * viewModelScope geçişte iptal olacağı için istek [appScope] üzerinde yürütülür.
-     */
-    override fun onCleared() {
-        val rentalId = _uiState.value.rentalId
-        if (rentalId != null && !startConfirmed) {
-            appScope.launch { rentalRepository.cancelRental(rentalId) }
-        }
+        load()
     }
 
     fun onIntent(intent: RentalPhotosIntent) {
         when (intent) {
-            RentalPhotosIntent.Retry -> resumeOrCreate()
-            is RentalPhotosIntent.PhotoCaptured -> uploadPhoto(intent.side, intent.path)
+            RentalPhotosIntent.Retry -> load()
+            is RentalPhotosIntent.PhotoCaptured -> capturePhoto(intent.side, intent.path)
             RentalPhotosIntent.StartClicked -> startRental()
+            RentalPhotosIntent.CancelClicked -> cancel()
             // Navigasyon Screen katmanında ele alınır (§4.6).
             RentalPhotosIntent.BackClicked -> Unit
 
-            // Ekran geçişi yaptı → bayrağı tüket (tekrar geçişi önler).
+            // Ekran geçişleri yaptı → bayrakları tüket (tekrar geçişi önler).
             RentalPhotosIntent.StartedHandled -> _uiState.update { it.copy(started = false) }
+            RentalPhotosIntent.CancelledHandled -> _uiState.update { it.copy(cancelled = false) }
         }
     }
 
-    /** POST /rentals/{id}/start: yolculuğu ACTIVE yapar; başarıda geçiş bayrağı verilir. */
-    private fun startRental() {
-        val state = _uiState.value
-        if (!state.canStart) return
-        val rentalId = state.rentalId ?: return
-
-        _uiState.update { it.copy(isStarting = true, errorMessage = null) }
+    /**
+     * Açılış/tekrar-dene: önce PREPARING kiralama (kurtarma), yoksa aktif rezervasyon (normal mod)
+     * yüklenir. İkisi de yoksa (404) rezervasyon süresi dolmuş sayılır; ağ/diğer hatada tekrar-dene.
+     */
+    private fun load() {
+        countdownJob?.cancel()
+        _uiState.update {
+            it.copy(isLoading = true, loadError = null, reservationExpired = false, errorMessage = null)
+        }
         viewModelScope.launch {
-            rentalRepository.startRental(rentalId)
-                .onSuccess {
-                    // Yolculuk ACTIVE: ekrandan çıkışta kiralama iptal EDİLMEZ.
-                    startConfirmed = true
-                    _uiState.update { it.copy(isStarting = false, started = true) }
-                }
-                .onFailure { e ->
+            // 1) Kurtarma: askıda PREPARING kiralama varsa devral (rezervasyon CONVERTED; geri sayım yok).
+            val preparing = rentalRepository.findPreparingRental().getOrNull()
+            if (preparing != null) {
+                resumePreparing(preparing)
+                return@launch
+            }
+            // 2) Normal mod: aktif rezervasyon → geri sayım + yerel çekim.
+            reservationRepository.getActiveReservation()
+                .onSuccess { reservation ->
+                    startVehicleId = reservation.vehicleId
                     _uiState.update {
                         it.copy(
-                            isStarting = false,
-                            errorMessage = e.toAppError().toUserMessage(ErrorContext.RIDE_START),
+                            isLoading = false,
+                            reservationId = reservation.reservationId,
+                            rentalId = null,
+                            vehicleTitle = reservation.vehicleTitle,
+                            vehiclePlate = reservation.vehiclePlate,
                         )
+                    }
+                    startCountdown(reservation.remainingSeconds)
+                }
+                .onFailure { e ->
+                    val error = e.toAppError()
+                    if (error is AppError.Api && error.code == 404) {
+                        // Aktif rezervasyon yok (süre doldu / iptal edildi) → bilgilendir, geri.
+                        _uiState.update { it.copy(isLoading = false, reservationExpired = true) }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                loadError = error.toUserMessage(ErrorContext.RESERVATION_LOAD),
+                            )
+                        }
                     }
                 }
         }
     }
 
     /**
-     * Açılış/tekrar-dene: kullanıcının açık (PREPARING) kiralaması varsa yeni açmak yerine foto
-     * akışını DEVRALIR (GET /rentals/{id}/photos ile yüklü yönler geri yüklenir); yoksa yeni PREPARING
-     * kiralama açar (POST /rentals). Uygulama beklenmedik kapanıp açıldığında yarım kalan akış buradan
-     * sürer (openapi resume sözleşmesi). Ekrandan bilerek geri çıkış hâlâ [onCleared] ile iptal eder.
+     * Askıda PREPARING kiralamayı devralır (kurtarma modu): kimlik + araç başlığı state'e alınır, foto
+     * durumu (yüklü yönler) GET /rentals/{id}/photos ile geri yüklenir. Foto durumu alınamazsa akış yine
+     * sürdürülür (eksik yönler yerelde tekrar çekilip "Başlat"ta yüklenir). Bu modda geri sayım yoktur.
      */
-    private fun resumeOrCreate() {
-        _uiState.update { it.copy(isCreating = true, createError = null) }
-        viewModelScope.launch {
-            val preparing = rentalRepository.findPreparingRental().getOrNull()
-            if (preparing != null) {
-                resumeRental(preparing)
-            } else {
-                createRental()
-            }
-        }
-    }
-
-    /**
-     * Açık PREPARING kiralamayı devralır: kimlik + araç başlığı state'e alınır, foto durumu (yüklü
-     * yönler/sayaç) GET /rentals/{id}/photos ile geri yüklenir. Foto durumu alınamazsa akış yine
-     * sürdürülür (eksik yönler tekrar çekilebilir). Yerel önizleme yolları olmadığından devralınan
-     * yönler yalnız yeşil rozetle gösterilir (SideCell [RentalPhotosUiState.uploadedSides]'a bakar).
-     */
-    private suspend fun resumeRental(preparing: ResumableRentalUi) {
+    private suspend fun resumePreparing(preparing: ResumableRentalUi) {
+        startVehicleId = preparing.vehicleId
         _uiState.update {
             it.copy(
                 rentalId = preparing.rentalId,
+                reservationId = null,
+                reservationRemaining = null,
                 vehicleTitle = preparing.vehicleTitle,
                 vehiclePlate = preparing.vehiclePlate,
             )
         }
         rentalRepository.getPhotos(preparing.rentalId)
-            .onSuccess { photosState ->
-                _uiState.update { it.applyPhotosState(photosState).copy(isCreating = false) }
+            .onSuccess { photos ->
+                _uiState.update {
+                    it.copy(isLoading = false, uploadedSides = photos.uploadedSides.toSides())
+                }
             }
             .onFailure {
-                _uiState.update { it.copy(isCreating = false) }
+                _uiState.update { it.copy(isLoading = false) }
             }
     }
 
-    /** POST /rentals: PREPARING kiralamayı açar; başlık için araç özetini state'e alır. */
-    private fun createRental() {
-        _uiState.update { it.copy(isCreating = true, createError = null) }
+    /** Kalan süreyi 1 sn'lik yerel sayaçla azaltır; 0'a inince süre dolar (araç sunucuda boşa çıkar). */
+    private fun startCountdown(seconds: Int) {
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
+            var remaining = seconds.coerceAtLeast(0)
+            _uiState.update { it.copy(reservationRemaining = remaining) }
+            while (remaining > 0) {
+                delay(1000)
+                remaining -= 1
+                _uiState.update { it.copy(reservationRemaining = remaining) }
+            }
+            _uiState.update { it.copy(reservationRemaining = null, reservationExpired = true) }
+        }
+    }
+
+    /** Çekilen kareyi yerelde saklar; yükleme "Başlat"a ertelenir (rezervasyon o ana dek aktif kalır). */
+    private fun capturePhoto(side: PhotoSide, path: String) {
+        _uiState.update {
+            it.copy(capturedPaths = it.capturedPaths + (side to path), errorMessage = null)
+        }
+    }
+
+    /**
+     * "Kiralamayı Başlat" zinciri: (1) kiralama yoksa POST /rentals ile açar (rezervasyon CONVERTED),
+     * (2) henüz yüklenmemiş kareleri sırayla POST /rentals/{id}/photos ile yükler, (3) POST
+     * /rentals/{id}/start çağırır. Herhangi bir adımda hata olursa kimlik/ilerleme korunur ve kullanıcı
+     * tekrar basınca kaldığı yerden sürer (yeniden create edilmez; yalnız eksik yönler yüklenir).
+     */
+    private fun startRental() {
+        if (!_uiState.value.canStart) return
+        countdownJob?.cancel() // zincir başladı; süre artık işlemez.
+        _uiState.update { it.copy(isStarting = true, errorMessage = null) }
         viewModelScope.launch {
-            rentalRepository.createRental(vehicleId, plan)
-                .onSuccess { rental ->
-                    _uiState.update {
-                        it.copy(
-                            isCreating = false,
-                            rentalId = rental.id,
-                            vehicleTitle = rental.vehicleTitle,
-                            vehiclePlate = rental.vehiclePlate,
-                        )
-                    }
+            // 1) Kiralamayı aç (yoksa). Rezervasyon burada CONVERTED olur.
+            val rentalId = _uiState.value.rentalId ?: run {
+                val created = rentalRepository.createRental(startVehicleId, plan).getOrElse { e ->
+                    fail(e, ErrorContext.RENTAL_CREATE)
+                    return@launch
                 }
+                _uiState.update {
+                    it.copy(rentalId = created.id, reservationId = null, reservationRemaining = null)
+                }
+                created.id
+            }
+
+            // 2) Yüklenmemiş yönleri sırayla yükle.
+            val pending = _uiState.value.capturedPaths
+                .filterKeys { it !in _uiState.value.uploadedSides }
+            for ((side, path) in pending) {
+                _uiState.update { it.copy(uploadingSide = side) }
+                val photos = rentalRepository.uploadPhoto(rentalId, side.apiValue, File(path))
+                    .getOrElse { e ->
+                        fail(e, ErrorContext.RENTAL_PHOTO_UPLOAD)
+                        return@launch
+                    }
+                _uiState.update {
+                    it.copy(uploadingSide = null, uploadedSides = photos.uploadedSides.toSides())
+                }
+            }
+
+            // 3) Yolculuğu başlat (ACTIVE).
+            rentalRepository.startRental(rentalId)
+                .onSuccess { _uiState.update { it.copy(isStarting = false, started = true) } }
+                .onFailure { e -> fail(e, ErrorContext.RIDE_START) }
+        }
+    }
+
+    /**
+     * "Rezervasyonu İptal Et": kiralama henüz oluşmadıysa aktif rezervasyonu DELETE /reservations/{id}
+     * ile iptal eder; "Başlat" bir kiralama açtıysa (kurtarma / yarım zincir) DELETE /rentals/{id} ile
+     * temizler. İkisi de aracı anında AVAILABLE yapar. İptal edilecek bir şey yoksa doğrudan çıkılır.
+     */
+    private fun cancel() {
+        if (!_uiState.value.canCancel) return
+        countdownJob?.cancel()
+        _uiState.update { it.copy(isCancelling = true, errorMessage = null) }
+        viewModelScope.launch {
+            val rentalId = _uiState.value.rentalId
+            val reservationId = _uiState.value.reservationId
+            val result = when {
+                rentalId != null -> rentalRepository.cancelRental(rentalId)
+                reservationId != null -> reservationRepository.cancelReservation(reservationId)
+                else -> Result.success(Unit)
+            }
+            result
+                .onSuccess { _uiState.update { it.copy(isCancelling = false, cancelled = true) } }
                 .onFailure { e ->
                     _uiState.update {
                         it.copy(
-                            isCreating = false,
-                            createError = e.toAppError().toUserMessage(ErrorContext.RENTAL_CREATE),
+                            isCancelling = false,
+                            errorMessage = e.toAppError().toUserMessage(ErrorContext.RESERVATION_CANCEL),
                         )
                     }
                 }
         }
     }
 
-    /** POST /rentals/{id}/photos: bir yönü yükler; sayaç/kalan yönler cevaptan güncellenir. */
-    private fun uploadPhoto(side: PhotoSide, path: String) {
-        val rentalId = _uiState.value.rentalId ?: return
-        // Aynı anda tek yön yüklensin (kart spinner'ı tek); yükleme sürerken yeni çekim atlanır.
-        if (_uiState.value.uploadingSide != null) return
-
+    /** Zincir hatası: spinner'ları kapatır, mesajı yazar; kimlik/ilerleme korunur (tekrar denenebilir). */
+    private fun fail(error: Throwable, context: ErrorContext) {
         _uiState.update {
             it.copy(
-                uploadingSide = side,
-                capturedPaths = it.capturedPaths + (side to path),
-                errorMessage = null,
+                isStarting = false,
+                uploadingSide = null,
+                errorMessage = error.toAppError().toUserMessage(context),
             )
-        }
-        viewModelScope.launch {
-            rentalRepository.uploadPhoto(rentalId, side.apiValue, File(path))
-                .onSuccess { photosState ->
-                    _uiState.update { it.applyPhotosState(photosState).copy(uploadingSide = null) }
-                }
-                .onFailure { e ->
-                    // Yükleme başarısız: yakalanan yolu geri al, hatayı göster (yeniden çekilebilir).
-                    _uiState.update {
-                        it.copy(
-                            uploadingSide = null,
-                            capturedPaths = it.capturedPaths - side,
-                            errorMessage = e.toAppError()
-                                .toUserMessage(ErrorContext.RENTAL_PHOTO_UPLOAD),
-                        )
-                    }
-                }
         }
     }
 
-    /** POST cevabındaki güncel foto durumunu (yüklü yönler + sayaç + tamamlanma) uygular. */
-    private fun RentalPhotosUiState.applyPhotosState(state: RentalPhotosUi): RentalPhotosUiState =
-        copy(
-            uploadedSides = state.uploadedSides.mapNotNull { PhotoSide.fromApi(it) }.toSet(),
-            uploadedCount = state.uploadedCount,
-            photosComplete = state.photosComplete,
-        )
+    /** API yön kodlarını ([RentalPhotosUi.uploadedSides]) tanınan [PhotoSide] kümesine çevirir. */
+    private fun List<String>.toSides(): Set<PhotoSide> = mapNotNull { PhotoSide.fromApi(it) }.toSet()
 }

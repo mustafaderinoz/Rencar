@@ -7,6 +7,7 @@ import com.turkcell.rencar.data.remote.api.ReservationApi
 import com.turkcell.rencar.data.remote.dto.CreateReservationRequest
 import javax.inject.Inject
 import javax.inject.Singleton
+import retrofit2.HttpException
 
 /**
  * Rezervasyon onayı iş akışı (karar: decisions.md → data + repository + ayrı mapper katmanı).
@@ -40,4 +41,15 @@ class ReservationRepository @Inject constructor(
      */
     suspend fun getActiveReservation(): Result<ReservationUi> =
         runCatching { reservationApi.getActive().toUi() }
+
+    /**
+     * DELETE /reservations/{id}: aktif rezervasyonu iptal eder (araç anında AVAILABLE olur). Aksine
+     * [com.turkcell.rencar.data.repository.RentalRepository.cancelRental]'daki sessiz temizlikten
+     * farklı olarak burada hata KULLANICIYA gösterilir: 204 dışı yanıt (403/404/409) [HttpException]'a
+     * çevrilir ki Result.failure olsun (mesaj eşlemesi ViewModel'de [ErrorContext.RESERVATION_CANCEL]).
+     */
+    suspend fun cancelReservation(reservationId: String): Result<Unit> = runCatching {
+        val response = reservationApi.cancel(reservationId)
+        if (!response.isSuccessful) throw HttpException(response)
+    }
 }

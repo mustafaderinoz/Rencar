@@ -86,7 +86,8 @@ object RencarDestinations {
 
     // 08 Araç durumu (kiralama öncesi fotoğraf) — Dakikalık/Saatlik rezervasyon sonrası açılır.
     // Kiralanacak araç id'si + plan path argümanı taşır: "rental_photos/{vehicleId}/{plan}".
-    // (RentalPhotosViewModel açılışta POST /rentals ile kiralamayı PREPARING oluşturur.)
+    // Rezervasyon 15 dk geri sayımı burada gösterilir; POST /rentals ancak "Kiralamayı Başlat"ta
+    // çağrılır (o ana dek rezervasyon aktif kalır, "Rezervasyonu İptal Et" ile iptal edilebilir).
     const val RENTAL_PHOTOS = "rental_photos"
     const val RENTAL_PHOTOS_ARG_VEHICLE_ID = "vehicleId"
     const val RENTAL_PHOTOS_ARG_PLAN = "plan"

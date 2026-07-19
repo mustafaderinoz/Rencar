@@ -251,7 +251,8 @@ fun RencarNavHost(
             )
         }
         // Araç durumu (kiralama öncesi fotoğraf): vehicleId + plan path argümanını taşır
-        // (RentalPhotosViewModel SavedStateHandle ile okur; açılışta POST /rentals çağırır).
+        // (RentalPhotosViewModel SavedStateHandle ile okur). Açılışta kiralama OLUŞTURULMAZ; aktif
+        // rezervasyonun 15 dk geri sayımı gösterilir, POST /rentals ancak "Başlat"ta çağrılır.
         composable(
             route = RencarDestinations.RENTAL_PHOTOS_ROUTE,
             arguments = listOf(
@@ -261,11 +262,19 @@ fun RencarNavHost(
         ) {
             RentalPhotosScreen(
                 onNavigateBack = { navController.popBackStack() },
-                // "Kiralamayı Başlat" (POST /rentals/{id}/start başarılı) → Aktif Yolculuk ekranı.
+                // "Kiralamayı Başlat" (POST /rentals → foto upload → start başarılı) → Aktif Yolculuk.
                 // Foto ekranı geri yığından çıkar: aktif yolculuktan geri → Home.
                 onStart = { rentalId ->
                     navController.navigate(RencarDestinations.activeRentalRoute(rentalId)) {
                         popUpTo(RencarDestinations.RENTAL_PHOTOS_ROUTE) { inclusive = true }
+                    }
+                },
+                // "Rezervasyonu İptal Et" (DELETE /reservations/{id}) → araç serbest; tüm akış temizlenip
+                // Home'a dönülür (Ödeme başarısı kalıbıyla aynı).
+                onCancelled = {
+                    navController.navigate(RencarDestinations.HOME) {
+                        popUpTo(RencarDestinations.HOME) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
             )

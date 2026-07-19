@@ -55,6 +55,7 @@ import com.turkcell.rencar.ui.theme.LightPrimary
 import com.turkcell.rencar.ui.theme.RenCarTheme
 import com.turkcell.rencar.ui.theme.rencar
 import java.io.File
+import java.util.Locale
 
 /** Marka mavisi — tema-bağımsız (bkz. Login/OTP/License). */
 private val RencarBlue = LightPrimary
@@ -64,6 +65,7 @@ private val RencarBlue = LightPrimary
 fun RentalPhotosScreen(
     onNavigateBack: () -> Unit,
     onStart: (rentalId: String) -> Unit,
+    onCancelled: () -> Unit,
     viewModel: RentalPhotosViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -132,6 +134,14 @@ fun RentalPhotosScreen(
         }
     }
 
+    // Rezervasyon/kiralama iptal edildi → Home'a dön, bayrağı tüket.
+    LaunchedEffect(uiState.cancelled) {
+        if (uiState.cancelled) {
+            onCancelled()
+            viewModel.onIntent(RentalPhotosIntent.CancelledHandled)
+        }
+    }
+
     RentalPhotosScreen(
         uiState = uiState,
         // Kamera tetikleyicisi (Android API) §4.5 istisnasıdır: sonuç PhotoCaptured intent'iyle VM'e
@@ -162,18 +172,25 @@ private fun RentalPhotosScreen(
         TopBar(onBack = { onIntent(RentalPhotosIntent.BackClicked) })
 
         when {
-            uiState.isCreating -> LoadingState(Modifier.weight(1f))
-            uiState.createError != null && uiState.rentalId == null ->
-                ErrorState(
-                    message = uiState.createError,
-                    onRetry = { onIntent(RentalPhotosIntent.Retry) },
-                    modifier = Modifier.weight(1f),
-                )
+            uiState.isLoading -> LoadingState(Modifier.weight(1f))
+
+            // Rezervasyon süresi doldu (araç sunucuda boşa çıktı) → bilgilendirme + geri.
+            uiState.reservationExpired -> ExpiredState(
+                onBack = { onIntent(RentalPhotosIntent.BackClicked) },
+                modifier = Modifier.weight(1f),
+            )
+
+            uiState.loadError != null -> ErrorState(
+                message = uiState.loadError,
+                onRetry = { onIntent(RentalPhotosIntent.Retry) },
+                modifier = Modifier.weight(1f),
+            )
 
             else -> Content(
                 uiState = uiState,
                 onCapture = onCapture,
                 onStartClicked = { onIntent(RentalPhotosIntent.StartClicked) },
+                onCancelClicked = { onIntent(RentalPhotosIntent.CancelClicked) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -221,12 +238,13 @@ private fun TopBar(onBack: () -> Unit) {
     }
 }
 
-// ── İçerik: araç satırı + sayaç, 2×2 yön ızgarası, uyarı, "Kiralamayı Başlat" ──
+// ── İçerik: geri sayım + araç satırı/sayaç, 2×2 yön ızgarası, uyarı, "Başlat" + "İptal Et" ──
 @Composable
 private fun Content(
     uiState: RentalPhotosUiState,
     onCapture: (PhotoSide) -> Unit,
     onStartClicked: () -> Unit,
+    onCancelClicked: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -235,6 +253,12 @@ private fun Content(
             .padding(horizontal = 20.dp),
     ) {
         Spacer(Modifier.height(4.dp))
+
+        // Rezervasyon 15 dk geri sayımı (yalnız normal modda; kurtarmada null).
+        uiState.reservationRemaining?.let {
+            ReservationCountdownBanner(it)
+            Spacer(Modifier.height(16.dp))
+        }
 
         // Araç + sayaç satırı: "Renault Clio · 34 RNC 022"  ···  "2 / 4 çekildi"
         Row(
@@ -250,7 +274,7 @@ private fun Content(
             )
             Spacer(Modifier.width(12.dp))
             Text(
-                text = "${uiState.uploadedCount} / ${uiState.totalSides} çekildi",
+                text = "${uiState.capturedCount} / ${uiState.totalSides} çekildi",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = RencarBlue,
@@ -271,7 +295,7 @@ private fun Content(
             SideCell(uiState, sides[3], onCapture, Modifier.weight(1f))
         }
 
-        // Tek foto yükleme hatası (varsa).
+        // Başlat/iptal/foto hatası (varsa).
         uiState.errorMessage?.let {
             Spacer(Modifier.height(14.dp))
             Text(
@@ -291,13 +315,19 @@ private fun Content(
             remainingCount = uiState.remainingCount,
             onStart = onStartClicked,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(4.dp))
+        CancelButton(
+            enabled = uiState.canCancel,
+            isCancelling = uiState.isCancelling,
+            onCancel = onCancelClicked,
+        )
+        Spacer(Modifier.height(8.dp))
     }
 }
 
 /**
- * Tek yön kartı. Yüklüyse yeşil zeminli + araç silüeti + onay rozeti; yüklenirken spinner;
- * boşken kesikli çerçeveli "Fotoğraf çek" alanı. Her kartın sol üstünde yön etiketi çipi.
+ * Tek yön kartı. Çekilmişse yeşil zeminli + araç silüeti + onay rozeti; yüklenirken (Başlat sırasında)
+ * spinner; boşken kesikli çerçeveli "Fotoğraf çek" alanı. Her kartın sol üstünde yön etiketi çipi.
  */
 @Composable
 private fun SideCell(
@@ -306,7 +336,7 @@ private fun SideCell(
     onCapture: (PhotoSide) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val isUploaded = side in uiState.uploadedSides
+    val isCaptured = side in uiState.capturedSides
     val isUploading = uiState.uploadingSide == side
 
     Box(
@@ -314,7 +344,7 @@ private fun SideCell(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(16.dp))
             .then(
-                if (isUploaded) {
+                if (isCaptured) {
                     Modifier.background(MaterialTheme.rencar.successContainer.copy(alpha = 0.55f))
                 } else {
                     Modifier
@@ -327,14 +357,22 @@ private fun SideCell(
         // Sol üst: yön etiketi çipi.
         SideLabelChip(
             label = side.label,
-            onSuccess = isUploaded,
+            onSuccess = isCaptured,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(12.dp),
         )
 
         when {
-            isUploaded -> {
+            isUploading -> CircularProgressIndicator(
+                color = RencarBlue,
+                strokeWidth = 2.dp,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(28.dp),
+            )
+
+            isCaptured -> {
                 // Sağ üst: yeşil onay rozeti.
                 Box(
                     modifier = Modifier
@@ -347,29 +385,26 @@ private fun SideCell(
                 ) {
                     Icon(
                         imageVector = RencarIcons.Check,
-                        contentDescription = "Yüklendi",
+                        contentDescription = "Çekildi",
                         tint = Color.White,
                         modifier = Modifier.size(16.dp),
                     )
                 }
-                // Merkez: soluk araç silüeti.
-                Icon(
-                    imageVector = RencarIcons.Car,
-                    contentDescription = null,
-                    tint = MaterialTheme.rencar.onSuccessContainer.copy(alpha = 0.35f),
+                // Merkez: soluk araç silüeti (yeniden çekmek için dokunulabilir).
+                Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(56.dp),
-                )
+                        .fillMaxSize()
+                        .clickable { onCapture(side) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = RencarIcons.Car,
+                        contentDescription = null,
+                        tint = MaterialTheme.rencar.onSuccessContainer.copy(alpha = 0.35f),
+                        modifier = Modifier.size(56.dp),
+                    )
+                }
             }
-
-            isUploading -> CircularProgressIndicator(
-                color = RencarBlue,
-                strokeWidth = 2.dp,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(28.dp),
-            )
 
             else -> {
                 // Boş durum: mavi kamera butonu + "Fotoğraf çek".
@@ -420,6 +455,40 @@ private fun SideLabelChip(label: String, onSuccess: Boolean, modifier: Modifier 
             )
             .padding(horizontal = 10.dp, vertical = 4.dp),
     )
+}
+
+// ── Rezervasyon geri sayım banner'ı: 15 dk ücretsiz tutmanın kalanı (mm:ss) ──
+@Composable
+private fun ReservationCountdownBanner(remainingSeconds: Int) {
+    val timeLabel = String.format(Locale.US, "%02d:%02d", remainingSeconds / 60, remainingSeconds % 60)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(RencarBlue.copy(alpha = 0.10f))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Rezervasyonunuz aktif",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Ücretsiz tutma süresi · fotoğrafları çekip başlatın",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = timeLabel,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = RencarBlue,
+        )
+    }
 }
 
 // ── Uyarı banner'ı: "Hasarları net çek — teslim sonrası anlaşmazlığı önler." ──
@@ -484,7 +553,39 @@ private fun StartButton(
     }
 }
 
-// ── Yükleniyor / Hata ──
+// ── Alt ikincil buton: "Rezervasyonu İptal Et" (DELETE /reservations/{id}) ──
+@Composable
+private fun CancelButton(
+    enabled: Boolean,
+    isCancelling: Boolean,
+    onCancel: () -> Unit,
+) {
+    TextButton(
+        onClick = onCancel,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        if (isCancelling) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.error,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(20.dp),
+            )
+        } else {
+            Text(
+                text = "Rezervasyonu İptal Et",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+// ── Yükleniyor / Hata / Süre doldu ──
 @Composable
 private fun LoadingState(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -513,6 +614,36 @@ private fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier 
     }
 }
 
+// Rezervasyon süresi doldu: araç sunucuda boşa çıktı → tekrar araç seçmesi için Home'a dönüş.
+@Composable
+private fun ExpiredState(onBack: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "Rezervasyon süresi doldu",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = "15 dakikalık ücretsiz tutma süresi sona erdi ve araç serbest bırakıldı. " +
+                "Kiralamak için aracı tekrar seçebilirsiniz.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
+        TextButton(onClick = onBack) {
+            Text(text = "Ana sayfaya dön", color = RencarBlue)
+        }
+    }
+}
+
 // ── Yardımcılar ──
 
 /** "Renault Clio · 34 RNC 022"; alanlar boşsa nokta ayırıcı atlanır. */
@@ -536,16 +667,18 @@ private fun Modifier.dashedBorder(color: Color, cornerRadius: Float): Modifier =
 
 // ── Preview'lar: stateless gövde, Hilt'siz, sabit state (§4.5) ──
 private val PreviewState = RentalPhotosUiState(
-    isCreating = false,
-    rentalId = "clx0rent1234567890",
+    isLoading = false,
+    reservationId = "clx0resv1234567890",
     vehicleTitle = "Renault Clio",
     vehiclePlate = "34 RNC 022",
-    uploadedSides = setOf(PhotoSide.FRONT, PhotoSide.BACK),
-    uploadedCount = 2,
-    photosComplete = false,
+    reservationRemaining = 726,
+    capturedPaths = mapOf(
+        PhotoSide.FRONT to "front.jpg",
+        PhotoSide.BACK to "back.jpg",
+    ),
 )
 
-@Preview(name = "RentalPhotos · Light", showBackground = true, heightDp = 760)
+@Preview(name = "RentalPhotos · Light", showBackground = true, heightDp = 820)
 @Composable
 private fun RentalPhotosLightPreview() {
     RenCarTheme(darkTheme = false) {
@@ -553,15 +686,14 @@ private fun RentalPhotosLightPreview() {
     }
 }
 
-@Preview(name = "RentalPhotos · Dark", showBackground = true, heightDp = 760)
+@Preview(name = "RentalPhotos · Dark", showBackground = true, heightDp = 820)
 @Composable
 private fun RentalPhotosDarkPreview() {
     RenCarTheme(darkTheme = true) {
         RentalPhotosScreen(
             uiState = PreviewState.copy(
-                uploadedSides = PhotoSide.entries.toSet(),
-                uploadedCount = 4,
-                photosComplete = true,
+                capturedPaths = PhotoSide.entries.associateWith { it.fileName },
+                reservationRemaining = 540,
             ),
             onCapture = {},
             onIntent = {},

@@ -32,6 +32,9 @@ enum class ErrorContext {
     /** POST /reservations — rezervasyon oluşturma. */
     RESERVATION_CREATE,
 
+    /** DELETE /reservations/{id} — rezervasyon iptali (foto ekranındaki "Rezervasyonu İptal Et"). */
+    RESERVATION_CANCEL,
+
     /** Rezervasyon ekranından doğrudan kiralamaya geçiş. */
     RESERVATION_RENT,
 
@@ -152,6 +155,13 @@ private fun contextualMessage(code: Int, context: ErrorContext): String? = when 
         403 -> "Rezervasyon için ehliyet onayınız gerekli."
         404 -> "Araç bulunamadı."
         409 -> "Bu araç artık müsait değil veya zaten aktif bir rezervasyonunuz var."
+        else -> null
+    }
+
+    ErrorContext.RESERVATION_CANCEL -> when (code) {
+        403 -> "Bu rezervasyon size ait değil."
+        404 -> "Rezervasyon bulunamadı."
+        409 -> "Rezervasyon zaten iptal edilmiş veya süresi dolmuş."
         else -> null
     }
 
@@ -296,6 +306,7 @@ private fun fallbackMessage(code: Int, context: ErrorContext): String = when (co
     ErrorContext.RESERVATION_LOAD,
     -> "Araç yüklenemedi ($code). Lütfen tekrar deneyin."
     ErrorContext.RESERVATION_CREATE -> "Rezervasyon oluşturulamadı ($code). Lütfen tekrar deneyin."
+    ErrorContext.RESERVATION_CANCEL -> "Rezervasyon iptal edilemedi ($code). Lütfen tekrar deneyin."
     ErrorContext.RESERVATION_RENT -> "Kiralama başlatılamadı ($code). Lütfen tekrar deneyin."
     ErrorContext.RENTAL_CREATE -> "Kiralama oluşturulamadı ($code). Lütfen tekrar deneyin."
     ErrorContext.RIDE_START -> "Yolculuk başlatılamadı ($code). Lütfen tekrar deneyin."

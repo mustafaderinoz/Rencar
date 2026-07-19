@@ -636,3 +636,32 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** yeni `data/model/ReservationUi`; güncellenen `data/remote/api/{ReservationApi,RentalApi}` (getActive/getPhotos), `data/mapper/{ReservationMapper,RentalMapper}` (toUi/toResumableUi), `data/model/RentalUi` (ResumableRentalUi), `data/repository/{ReservationRepository,RentalRepository}` (getActiveReservation/getPhotos/findPreparingRental/findResumableRental), `ui/rentalphotos/RentalPhotosViewModel` (resumeOrCreate), `ui/reservation/{ReservationContract,ReservationViewModel,ReservationScreen}` (geri sayım + kurtarma görünümü + "Devam Et"), `ui/splash/{SplashContract,SplashViewModel}` (sealed hedef + kurtarma), `ui/navigation/RencarNavHost` (kurtarma route eşlemesi).
 
 - Not (20.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` + `:app:assembleDebug` başarılı.** Emülatör/cihaz doğrulaması yapılmadı (kurtarma senaryoları CUSTOMER hesabı + aktif rezervasyon/kiralama state'i gerektirir).
+
+---
+
+### Rezervasyon → Foto → Başlat: Kiralama Oluşturmayı Erteleme + Foto Ekranından İptal — `DELETE /reservations/{id}`
+
+- Seçim: **Foto ekranında `POST /rentals` artık AÇILIŞTA çağrılmaz; yalnız "Kiralamayı Başlat" anında çalışır.** Böylece rezervasyon (15 dk ücretsiz tutma) "Başlat"a dek AKTİF kalır, **geri sayım foto ekranında gösterilir** ve foto ekranına görünür bir **"Rezervasyonu İptal Et"** butonu (`DELETE /reservations/{id}`) eklenir. Çekilen 4 kare **yerelde** tutulur; "Başlat" tek zincirle `POST /rentals` (rezervasyon CONVERTED) → 4× `POST /rentals/{id}/photos` → `POST /rentals/{id}/start` çalıştırır. **Rezervasyon yalnız bu butonla iptal edilir**; ekrandan geri çıkış iptal ETMEZ (`onCleared` iptali kaldırıldı).
+
+- Son Güncelleme Tarihi: 20.07.2026
+
+- **BU KARAR, aynı gün alınan "Foto Akışı Devralma + Rezervasyon Geri Sayımı/Kurtarma" kararındaki üç notu GEÇERSİZ KILAR** (kullanıcı isteğini netleştirdi):
+  1. *"foto sırasında 15 dk aksın isteği kullanıcı tarafından geri çekildi"* → **geri alındı**: kullanıcı geri sayımın foto ekranında görünmesini açıkça istedi. Bunu mümkün kılan tek yol `POST /rentals`'i ertelemek olduğundan (aksi halde rezervasyon CONVERTED olur, `GET /reservations/active` 404 döner, sayaç kaybolur) kiralama oluşturma "Başlat"a taşındı.
+  2. *"`DELETE /reservations/{id}` KAPSAM DIŞI"* → **artık kapsamda**: uç bağlandı ve foto ekranındaki iptal butonuna verildi.
+  3. *"ekrandan bilerek geri çıkış PREPARING'i `onCleared` ile iptal eder"* → **kaldırıldı**: foto aşamasında henüz PREPARING yoktur (ertelendi); iptal yalnız butonla yapılır, geri çıkış rezervasyonu 15 dk TTL'ine bırakır.
+
+- Sebep: Kullanıcının tarif ettiği akış ("Tamamla → 15 dk başlar → sayaç foto ekranında → 'Başlat'a dek rezervasyon tamamlanmış sayılmaz → iptal sadece burada") API sözleşmesiyle ancak kiralama oluşturmayı "Başlat"a erteleyerek tutarlı olur. Fotoğraf yalnız bir kiralamaya yüklenebildiğinden (`POST /rentals/{id}/photos`) ve kiralama oluşturmak rezervasyonu CONVERTED yaptığından, kareler yerelde tutulup toplu olarak "Başlat"ta yüklenir — rezervasyonu foto boyunca aktif tutmanın başka yolu yoktur (§2.2).
+
+- **Kararlar/sapmalar:**
+  - **İki mod (init):** önce `findPreparingRental()` — askıda PREPARING kiralama varsa (yarım "Başlat" ya da süreç ölümü; rezervasyon o noktada CONVERTED) **kurtarma modu** (foto durumu `GET /rentals/{id}/photos`'tan, geri sayım yok, iptal `DELETE /rentals/{id}`); yoksa `GET /reservations/active` ile **normal mod** (geri sayım + yerel çekim + iptal `DELETE /reservations/{id}`). Kurtarma önce denenir ki dangling PREPARING kullanıcıyı yeni rezervasyondan kilitlemesin.
+  - **"Başlat" resume-güvenli:** zincir ortasında hata olursa `rentalId` + yüklenmiş yönler state'te korunur; kullanıcı tekrar basınca create atlanır, yalnız eksik yönler yüklenir, start çağrılır (yeniden 409 riski yok).
+  - **İptal tek buton, iki uç:** kiralama henüz yoksa `DELETE /reservations/{id}` (aktif olduğundan çalışır; 403/404/409 → `ErrorContext.RESERVATION_CANCEL` metni), kiralama oluştuysa `DELETE /rentals/{id}` (mevcut sessiz temizlik). İkisi de aracı anında AVAILABLE yapar; başarıda Home'a dönülür (Ödeme başarısı kalıbı).
+  - **Süre dolması:** normal modda yerel sayaç 0'a inince araç sunucuda boşa çıktığından "Rezervasyon süresi doldu" bilgilendirmesi + "Ana sayfaya dön" gösterilir (kullanıcı onayıyla; sessiz değil).
+  - **Kurtarma sırası (Splash) değişmedi:** foto aşamasında yalnız rezervasyon olduğundan süreç ölümünde `resolveActiveFlow` → `ActiveReservation` → Rezervasyon ekranı ("Devam Et" → foto ekranı). Yerel kareler kaybolur, yeniden çekilir. "Başlat" bir PREPARING oluşturduysa süreç ölümünde `PreparingRental` → foto ekranı kurtarma modu.
+  - **DTO izolasyonu korunur ("Katman Derinliği"):** `ReservationApi.cancel` `Response<Unit>` döner; 204 dışı yanıt `HttpException`'a çevrilir (PaymentRepository kart-silme kalıbı) ki 4xx `Result.failure` olsun. `ui/` içinde `data.remote.dto` importu yoktur.
+
+- **Yeni bağımlılık YOK.** Mevcut Retrofit + kotlinx.serialization + Hilt + Compose yeterli; DI değişmedi (mevcut `ReservationApi`'ye metot eklendi).
+
+- **Dokunulan/eklenen dosyalar:** güncellenen `data/remote/api/ReservationApi` (cancel), `data/repository/ReservationRepository` (cancelReservation), `util/ErrorMessages` (RESERVATION_CANCEL), `ui/rentalphotos/{RentalPhotosContract,RentalPhotosViewModel,RentalPhotosScreen}` (iki mod + yerel çekim + geri sayım + Başlat zinciri + iptal), `ui/navigation/{RencarNavHost,RencarDestinations}` (onCancelled + yorum). `RentalPhotosViewModel`'den `appScope` (yalnız eski `onCleared` iptali için vardı) kaldırıldı.
+
+- Not (20.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Emülatör/cihaz doğrulaması yapılmadı (CUSTOMER hesabı + aktif rezervasyon state'i gerektirir).
