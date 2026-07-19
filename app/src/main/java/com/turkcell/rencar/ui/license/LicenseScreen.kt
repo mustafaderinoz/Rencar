@@ -152,7 +152,7 @@ fun LicenseScreen(
     LaunchedEffect(uiState.proceed) {
         if (uiState.proceed) {
             onNavigateToSelfie(uiState.frontPath.orEmpty(), uiState.backPath.orEmpty())
-            viewModel.onProceedHandled()
+            viewModel.onIntent(LicenseIntent.ProceedHandled)
         }
     }
 

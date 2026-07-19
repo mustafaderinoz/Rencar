@@ -80,7 +80,7 @@ fun OtpVerificationScreen(
                 PostVerifyDestination.LICENSE_UPLOAD -> onNavigateToLicense()
                 PostVerifyDestination.LICENSE_PENDING -> onNavigateToLicensePending()
             }
-            viewModel.onVerifiedHandled()
+            viewModel.onIntent(OtpVerificationIntent.VerifiedHandled)
         }
     }
 

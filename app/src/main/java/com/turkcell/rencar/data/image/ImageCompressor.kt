@@ -1,4 +1,4 @@
-package com.turkcell.rencar.data.util
+package com.turkcell.rencar.data.image
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

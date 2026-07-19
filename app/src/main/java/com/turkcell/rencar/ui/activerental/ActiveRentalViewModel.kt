@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.model.ActiveRentalUi
 import com.turkcell.rencar.data.repository.RentalRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -17,7 +19,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Aktif Yolculuk ekranının tek durum kaynağı (§4.4).
@@ -102,7 +103,15 @@ class ActiveRentalViewModel @Inject constructor(
                     .onFailure { e ->
                         // İlk yükleme başarısızsa tam ekran hata; sonraki geçici hatalar yok sayılır
                         // (ekran son bilinen değerleri gösterir).
-                        if (first) _uiState.update { it.copy(isLoading = false, loadError = e.toLoadMessage()) }
+                        if (first) {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    loadError = e.toAppError()
+                                        .toUserMessage(ErrorContext.ACTIVE_RENTAL_STATUS),
+                                )
+                            }
+                        }
                     }
                 first = false
                 if (_uiState.value.isFinished) break
@@ -179,7 +188,13 @@ class ActiveRentalViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isFinishing = false, finishError = e.toFinishMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isFinishing = false,
+                            finishError = e.toAppError()
+                                .toUserMessage(ErrorContext.ACTIVE_RENTAL_FINISH),
+                        )
+                    }
                 }
         }
     }
@@ -194,28 +209,6 @@ class ActiveRentalViewModel @Inject constructor(
         pollJob?.cancel(); pollJob = null
         tickerJob?.cancel(); tickerJob = null
         socketJob?.cancel(); socketJob = null
-    }
-
-    private fun Throwable.toLoadMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            404 -> "Aktif yolculuk bulunamadı."
-            else -> "Yolculuk durumu alınamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private fun Throwable.toFinishMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Bu yolculuk size ait değil."
-            404 -> "Yolculuk bulunamadı."
-            409 -> "Yolculuk bitirilemedi: zaten bitmiş olabilir."
-            else -> "Yolculuk bitirilemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 
     private companion object {

@@ -5,9 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.repository.LicenseRepository
 import com.turkcell.rencar.ui.navigation.RencarDestinations
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.FormMessages
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.io.File
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -16,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Selfie doğrulama ViewModel'i. Ehliyet yollarını nav argümanından [SavedStateHandle] ile
@@ -58,7 +60,7 @@ class SelfieViewModel @Inject constructor(
                         captureRequested = false,
                         holdProgress = 0f,
                         faceStatus = FaceStatus.NoFace,
-                        errorMessage = "Selfie çekilemedi. Lütfen tekrar deneyin.",
+                        errorMessage = FormMessages.SELFIE_CAPTURE_FAILED,
                     )
                 }
 
@@ -130,23 +132,12 @@ class SelfieViewModel @Inject constructor(
                             isUploading = false,
                             holdProgress = 0f,
                             faceStatus = FaceStatus.NoFace,
-                            errorMessage = e.toMessage(),
+                            errorMessage = e.toAppError()
+                                .toUserMessage(ErrorContext.SELFIE_UPLOAD),
                         )
                     }
                 }
         }
-    }
-
-    private fun Throwable.toMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            400 -> "Fotoğraf geçersiz. Ehliyet adımına dönüp tekrar çekin."
-            401 -> "Oturum doğrulanamadı. Lütfen tekrar giriş yapın."
-            409 -> "Ehliyetiniz zaten incelemede veya onaylı."
-            413 -> "Fotoğraf boyutu çok büyük. Lütfen tekrar deneyin."
-            else -> "Bir hata oluştu (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 
     private companion object {

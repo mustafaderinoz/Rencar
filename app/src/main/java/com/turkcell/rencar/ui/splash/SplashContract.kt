@@ -5,7 +5,7 @@ package com.turkcell.rencar.ui.splash
  *
  * Uygulama açılışında saklı token'la oturum sessizce geri yüklenmeye çalışılır; çözülen ilk hedef
  * [destination] ile ekrana bildirilir (§4.6: Effect kanalı yerine state bayrağı; navigasyon ekran
- * katmanında ele alınır). [destination] yalnız bir kez tüketilir (bkz. SplashViewModel.onDestinationHandled).
+ * katmanında ele alınır). [destination] yalnız bir kez tüketilir (bkz. [SplashIntent.DestinationHandled]).
  */
 data class SplashUiState(
     val isLoading: Boolean = true,
@@ -28,4 +28,7 @@ enum class SplashDestination { ONBOARDING, LOGIN, HOME, LICENSE_UPLOAD, LICENSE_
 sealed interface SplashIntent {
     /** Ağ hatası sonrası oturum geri-yüklemeyi yeniden dener. */
     data object Retry : SplashIntent
+
+    /** Ekran [SplashUiState.destination] geçişini yaptı → bayrak tüketilir. */
+    data object DestinationHandled : SplashIntent
 }

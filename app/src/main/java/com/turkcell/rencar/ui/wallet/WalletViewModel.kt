@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.repository.PaymentRepository
 import com.turkcell.rencar.data.repository.WalletRepository
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +15,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 /**
  * Cüzdan ekranının tek durum kaynağı (§4.4). Açılışta iki çağrı paralel yüklenir: GET /wallet
@@ -81,7 +82,12 @@ class WalletViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, loadError = e.toLoadMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            loadError = e.toAppError().toUserMessage(ErrorContext.WALLET_LOAD),
+                        )
+                    }
                 }
         }
     }
@@ -100,7 +106,12 @@ class WalletViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isToppingUp = false, topupError = e.toTopupMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isToppingUp = false,
+                            topupError = e.toAppError().toUserMessage(ErrorContext.WALLET_TOPUP),
+                        )
+                    }
                 }
         }
     }
@@ -117,7 +128,13 @@ class WalletViewModel @Inject constructor(
             paymentRepository.setDefaultCard(cardId)
                 .onSuccess { cards -> _uiState.update { it.copy(settingDefaultCardId = null, cards = cards) } }
                 .onFailure { e ->
-                    _uiState.update { it.copy(settingDefaultCardId = null, cardActionError = e.toCardActionMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            settingDefaultCardId = null,
+                            cardActionError = e.toAppError()
+                                .toUserMessage(ErrorContext.WALLET_CARD_ACTION),
+                        )
+                    }
                 }
         }
     }
@@ -132,7 +149,13 @@ class WalletViewModel @Inject constructor(
             paymentRepository.deleteCard(cardId)
                 .onSuccess { cards -> _uiState.update { it.copy(deletingCardId = null, cards = cards) } }
                 .onFailure { e ->
-                    _uiState.update { it.copy(deletingCardId = null, cardActionError = e.toCardActionMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            deletingCardId = null,
+                            cardActionError = e.toAppError()
+                                .toUserMessage(ErrorContext.WALLET_CARD_ACTION),
+                        )
+                    }
                 }
         }
     }
@@ -167,7 +190,12 @@ class WalletViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isAddingCard = false, addCardError = e.toAddCardMessage()) }
+                    _uiState.update {
+                        it.copy(
+                            isAddingCard = false,
+                            addCardError = e.toAppError().toUserMessage(ErrorContext.CARD_ADD),
+                        )
+                    }
                 }
         }
     }
@@ -190,45 +218,5 @@ class WalletViewModel @Inject constructor(
                 addCardError = null,
             )
         }
-    }
-
-    private fun Throwable.toLoadMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            403 -> "Cüzdana erişim için hesabınızın onaylı olması gerekir."
-            else -> "Cüzdan bilgileri alınamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private fun Throwable.toTopupMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            400 -> "Tutar 10 – 5.000 ₺ aralığında olmalı."
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            else -> "Bakiye yüklenemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private fun Throwable.toCardActionMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            404 -> "Kart bulunamadı."
-            else -> "İşlem tamamlanamadı (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
-    }
-
-    private fun Throwable.toAddCardMessage(): String = when (this) {
-        is HttpException -> when (code()) {
-            400 -> "Kart bilgileri geçersiz (son kullanma tarihi geçmiş olabilir)."
-            401 -> "Oturum bulunamadı. Lütfen tekrar giriş yapın."
-            else -> "Kart kaydedilemedi (${code()}). Lütfen tekrar deneyin."
-        }
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 }

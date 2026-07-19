@@ -54,4 +54,7 @@ sealed interface RegisterIntent {
     data object SubmitClicked : RegisterIntent
     data object BackClicked : RegisterIntent
     data object LoginClicked : RegisterIntent
+
+    /** Ekran [RegisterUiState.registered] geçişini yaptı → bayrak tüketilir. */
+    data object RegisteredHandled : RegisterIntent
 }

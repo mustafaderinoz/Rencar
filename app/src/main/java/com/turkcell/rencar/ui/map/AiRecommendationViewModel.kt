@@ -3,6 +3,9 @@ package com.turkcell.rencar.ui.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.repository.AiRepository
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,7 +55,12 @@ class AiRecommendationViewModel @Inject constructor(
                     _uiState.update { it.copy(isLoading = false, recommendedIds = ids) }
                 }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, error = "Öneri alınamadı: ${e.message}") }
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = e.toAppError().toUserMessage(ErrorContext.AI_RECOMMENDATION),
+                        )
+                    }
                 }
         }
     }

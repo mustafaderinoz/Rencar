@@ -3,15 +3,17 @@ package com.turkcell.rencar.ui.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.turkcell.rencar.data.repository.AuthRepository
+import com.turkcell.rencar.util.ErrorContext
+import com.turkcell.rencar.util.isUnauthorized
+import com.turkcell.rencar.util.toAppError
+import com.turkcell.rencar.util.toUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.IOException
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
@@ -37,6 +39,11 @@ class LoginViewModel @Inject constructor(
             // Navigasyon ekran (Screen) katmanında ele alınır.
             LoginIntent.BackClicked -> Unit
             LoginIntent.RegisterClicked -> Unit
+
+            // Ekran geçişi yaptı → bayrakları tüket (tekrar geçişi önler).
+            LoginIntent.CodeSentHandled -> _uiState.update { it.copy(codeSent = false) }
+            LoginIntent.NavigateToRegisterHandled ->
+                _uiState.update { it.copy(navigateToRegister = false) }
         }
     }
 
@@ -55,32 +62,17 @@ class LoginViewModel @Inject constructor(
                     // 401 = "bu numaraya kayıtlı kullanıcı yok". Backend kayıtsız numaraya OTP
                     // göndermediğinden kayıtsızlık ancak burada anlaşılır: hata göstermek yerine
                     // kullanıcı kayıt ekranına alınır (numara oraya taşınır).
-                    if (e is HttpException && e.code() == 401) {
+                    if (e.toAppError().isUnauthorized) {
                         _uiState.update { it.copy(isLoading = false, navigateToRegister = true) }
                     } else {
-                        _uiState.update { it.copy(isLoading = false, errorMessage = e.toMessage()) }
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = e.toAppError().toUserMessage(ErrorContext.LOGIN),
+                            )
+                        }
                     }
                 }
         }
-    }
-
-    /** Ekran, codeSent bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
-    fun onCodeSentHandled() {
-        _uiState.update { it.copy(codeSent = false) }
-    }
-
-    /** Ekran, navigateToRegister bayrağını navigasyonda tüketince çağrılır (tekrar geçişi önler). */
-    fun onNavigateToRegisterHandled() {
-        _uiState.update { it.copy(navigateToRegister = false) }
-    }
-
-    /**
-     * Kullanıcıya gösterilecek hata metni. 401 BURAYA DÜŞMEZ — kayıt akışına yönlendirme sinyali
-     * olarak [sendCode] içinde ayrı ele alınır.
-     */
-    private fun Throwable.toMessage(): String = when (this) {
-        is HttpException -> "Bir hata oluştu (${code()}). Lütfen tekrar deneyin."
-        is IOException -> "İnternet bağlantısı kurulamadı."
-        else -> "Beklenmeyen bir hata oluştu."
     }
 }

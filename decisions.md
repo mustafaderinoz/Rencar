@@ -541,3 +541,70 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** yeni `ui/rentalreturnphotos/{RentalReturnPhotosContract,RentalReturnPhotosViewModel,RentalReturnPhotosScreen}`; güncellenen `ui/navigation/RencarDestinations` (RENTAL_RETURN_PHOTOS rotası + `rentalReturnPhotosRoute`), `ui/navigation/RencarNavHost` (yeni composable + ActiveRental geçişi), `ui/activerental/ActiveRentalScreen` (`onNavigateToPayment` → `onNavigateToReturnPhotos`; "Ödemeye yönlendiriliyorsunuz…" metinleri teslim adımına göre güncellendi).
 
 - Not (19.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Emülatör/cihaz doğrulaması yapılmadı.
+
+---
+
+### Merkezî Hata Yönetimi (`util/AppError.kt` + `util/ErrorMessages.kt`)
+
+- Seçim: **Hiçbir ViewModel hata mesajını elle (hard-coded string) üretmez.** Ham `Throwable`'lar tek tip bir modele (`AppError`) indirgenir, kullanıcı metni tek bir yerden — `util/ErrorMessages.kt` — çözülür. ViewModel'de kullanım tek satırdır:
+  ```kotlin
+  errorMessage = e.toAppError().toUserMessage(ErrorContext.PAYMENT_PAY)
+  ```
+
+- Son Güncelleme Tarihi: 19.07.2026
+
+- Alternatifler: **Metinleri `strings.xml`'e taşımak** (ViewModel'e `Context`/`resources` sızar veya UiState'te `@StringRes`+args taşımak gerekir; bağlama duyarlı kod→metin eşlemesi yine bir yerde kodlanacaktı). **Her ekranda `Throwable.toXMessage()` uzantısı** — mevcut durum; aşağıya bakınız.
+
+- Sebep: Değişiklik öncesi **17 ViewModel'de ~150 hard-coded Türkçe metin** vardı; `"İnternet bağlantısı kurulamadı."` 17 kez, `"Oturum bulunamadı. Lütfen tekrar giriş yapın."` 18 kez kopyalanmıştı. Metin tablosunun kaynağı `docs/api/openapi.json` uç yanıtlarıdır; yeni uç eklendiğinde artık **yalnız `ErrorMessages.kt`** güncellenir, ViewModel'lere dokunulmaz ("Minimum Değişiklik İlkesi").
+
+- **Yapı iki dosyadır:**
+  | Dosya | Sorumluluk |
+  |---|---|
+  | `util/AppError.kt` | Tek tip hata modeli (`sealed class AppError`: `Network` / `Api(code)` / `Unknown`) + `Throwable.toAppError()` + `AppError.isUnauthorized` |
+  | `util/ErrorMessages.kt` | `AppError` → Türkçe metin (`toUserMessage()`) + ekran bağlamı (`ErrorContext`, 26 değer) + `FormMessages` |
+
+- **Çözüm sırası ÖNEMLİDİR** (`resolveApiMessage`, ilk eşleşen kazanır): (1) bağlama özgü net eşleme → (2) ekranlar arası ortak eşleme (401 = oturum yok) → (3) bağlamın genel yedeği (HTTP kodu metinde korunur). Aynı kod ekrana göre farklı çözülür; ör. **403**: `MAP` → "Araçları görmek için ehliyet onayınız gerekli.", `ACTIVE_RENTAL_FINISH` → "Bu yolculuk size ait değil."
+
+- **Kararlar/sapmalar:**
+  - **Genel 5xx dalı EKLENMEDİ** (örnekteki kalıptan sapma): mevcut kodda 5xx zaten her ekranın kendi yedeğine düşüyordu ve `IYZICO_INIT` 503'ün kendine özel metni var. Genel bir 5xx dalı bunu gölgeler ve mevcut UI metinlerini değiştirirdi.
+  - **401 ortak eşlemesinin İSTİSNALARI** (`CONTEXTS_WITHOUT_SHARED_AUTH`): `LOGIN`'de 401 hata değil **kayıt akışına yönlendirme sinyalidir**; `IYZICO_SETTLE`'da para çekilmiş olduğundan mesaj oturumu değil tahsilatı anlatmalıdır.
+  - **`hasDiscount` bayrağı bağlama dönüştü:** `toPayMessage(hasDiscount)` yerine iki ayrı bağlam — `PAYMENT_PAY` / `PAYMENT_PAY_DISCOUNT`.
+  - **Yerel form metinleri de taşındı** (`FormMessages`): kayıt doğrulaması, `RegisterError` karşılıkları, "Lütfen bir kart seçin.", `IYZICO_NOT_COMPLETED`, selfie çekim hatası. ViewModel yalnız **hangi ALANA** yazılacağına karar verir.
+  - **`retrofit2`/`java.io` artık `ui/` katmanında YOK** (grep ile doğrulandı): akış kontrolü için kalan iki 401 kontrolü (`LoginViewModel`, `SplashViewModel`) `AppError.isUnauthorized`'a çevrildi. Kütüphane sınırı `util/AppError.kt`'de emilir.
+  - **Tek metin değişikliği — `AiRecommendationViewModel`:** eski `"Öneri alınamadı: ${e.message}"` ham exception metnini kullanıcıya sızdırıyordu; artık diğer ekranlarla aynı kalıba (`AI_RECOMMENDATION` bağlamı) çözülür. Diğer TÜM metinler birebir korundu (§2.2 — yeni metin uydurulmadı).
+  - **`ReservationViewModel.toRentMessage`** ölü koddu; içeriği `RESERVATION_RENT` bağlamına taşındı ve `startDailyRental` oraya bağlandı.
+
+- **Yeni bağımlılık YOK.** UiState/Intent/Screen katmanları **değişmedi** (mesajlar `String` olarak kalır → UI dokunulmadı).
+
+- **Paket sınırı — `data/util` → `data/image` yeniden adlandırıldı (19.07.2026):** Yeni kök `util/` paketi eklenince ağaçta iki "util" belirdi ve kardeş gibi göründüler; oysa değiller. `data/image` (`ImageCompressor` + `File.toImagePart`) `okhttp3`/`Bitmap`'e bağlıdır, `internal`'dır ve YALNIZ iki repository tarafından kullanılır — data katmanından çıkmaz. Kök `util/` ise bağımlılıksızdır ve 15 ViewModel tarafından tüketilir. İkisini birleştirmek OkHttp/Bitmap bağımlılığını ui'ın serbestçe import ettiği bir pakete sızdırırdı. "util" jenerik bir çöp-kutusu adı olduğundan görev adı (`image`) tercih edildi: paket kendi kendini açıklar, sınırı anlatan ek bir nota gerek kalmaz. `git mv` ile taşındığından dosya geçmişi korundu.
+
+- **Dokunulan/eklenen dosyalar:** yeni `util/AppError`, `util/ErrorMessages`; güncellenen 15 ViewModel — `ui/{login,otp,register,profile,map(Map+AiRecommendation),vehicledetail,reservation,rentals,rentalphotos,activerental,selfie,payment,wallet,splash}`.
+
+- Not (19.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Emülatör/cihaz doğrulaması yapılmadı.
+
+---
+
+### MVI Kalıp Denetimi ve Hizalama (AGENTS §4)
+
+- Seçim: **`ui/` katmanı AGENTS §4 referans kalıbına birebir hizalandı.** Denetimde bulunan iki ihlal giderildi, iki bilinçli sapma bu kayıtla resmîleştirildi.
+
+- Son Güncelleme Tarihi: 19.07.2026
+
+- **Denetim sonucu (hizalama ÖNCESİ):** §4.4 çekirdek mekaniği 18/18 ViewModel'de eksiksizdi (`@HiltViewModel` + `private _uiState` + `asStateFlow()` + `onIntent`), Contract yapıları (§4.2/§4.3) kurala uygundu ve **hiçbir yerde Effect kanalı (`Channel`/`SharedFlow`) yoktu** — navigasyon state bayrağı + `LaunchedEffect` ile (§4.6). İki ihlal vardı:
+
+- **İhlal 1 — §4.4 "Tek giriş noktası `onIntent`" (9 yer, 8 ekran):** ViewModel'lerde `onIntent` DIŞINDA public fonksiyonlar vardı: `onCodeSentHandled`, `onNavigateToRegisterHandled`, `onVerifiedHandled`, `onRegisteredHandled`, `onProceedHandled`, `onStartedHandled`, `onReservedHandled`, `onRentalStartedHandled`, `onDestinationHandled`. Hepsi aynı işi yapıyordu: ekranın navigasyon bayrağını tükettiğini bildirmek.
+  - **Düzeltme:** her biri bir Intent'e çevrildi (`LoginIntent.CodeSentHandled`, `SplashIntent.DestinationHandled` vb.); reducer `onIntent`'in `when`'ine taşındı, ekran `viewModel.onIntent(...)` çağırıyor. **Davranış değişmedi**, yalnız kanal tekleşti.
+
+- **İhlal 2 — §4.5 "stateless gövde yalnız `uiState` + `onIntent` alır":** `MapScreen`'in stateless gövdesi `onNavigateToReservation` parametresi alıyor ve içeriden doğrudan çağırıyordu.
+  - **Düzeltme:** yeni `MapIntent.ReserveClicked(vehicleId)`; navigasyonu stateful sarmalayıcı yakalar (`VehicleDismissed` + `onNavigateToReservation`). Parametre stateless imzadan kaldırıldı.
+  - **Karşı örnek (İHLAL DEĞİL):** `LicenseScreen`'in `onCaptureFront`/`onCaptureBack` ve `SelfieScreen`'in izin/çekim callback'leri §4.5'in **Android-launcher istisnası** kapsamındadır — durum değiştirmez, yalnız launcher tetikler; sonuç Intent ile döner.
+
+- **Bilinçli sapma 1 — §4.1 üçlüsü olmayan 2 ekran:** `ui/home/HomeScreen.kt` ve `ui/licensepending/LicensePendingScreen.kt` için `Contract`+`ViewModel` **EKLENMEDİ**. İkisi de gerçekten durumsuzdur: Home saf sekme kabıdır (iç `NavHost` + `RencarBottomBar`; her sekme kendi MVI ekranına bağlıdır), LicensePending statik bilgi ekranıdır. Boş bir `UiState()` + boş `onIntent` üretmek kalıbı tatmin eder ama hiçbir şey ifade etmez. **Bu ekranlara durum girdiği anda üçlü kurulacaktır.**
+
+- **Bilinçli sapma 2 — §4.1 `AiRecommendation` yerleşimi:** `ui/map/AiRecommendation{Contract,ViewModel,Dialog}.kt` kendi `ui/<feature>/` paketinde değildir ve `Screen` yerine `Dialog`'dur. Bağımsız bir ekran değil, **Harita'nın alt bileşenidir** (kendi rotası yoktur; `MapScreen` içinden `showAiDialog` ile açılır). Contract+ViewModel ayrımı korunduğundan MVI çekirdeği bozulmaz; yalnız dosya adı/paket kalıbı Map'e tabidir.
+
+- **Yeni bağımlılık YOK.** UiState alanları, Screen tasarımları ve navigasyon davranışı **değişmedi**.
+
+- **Dokunulan dosyalar:** `ui/login/*`, `ui/otp/*`, `ui/register/*`, `ui/license/*`, `ui/splash/*`, `ui/rentalphotos/*`, `ui/reservation/*` (her biri Contract+ViewModel+Screen), `ui/map/{MapContract,MapViewModel,MapScreen}`.
+
+- Not (19.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Denetim grep ile tekrarlandı: `onIntent` dışında public VM fonksiyonu YOK, stateless gövdelerde navigasyon callback'i YOK. Emülatör/cihaz doğrulaması yapılmadı.

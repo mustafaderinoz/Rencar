@@ -69,7 +69,7 @@ fun RegisterScreen(
     LaunchedEffect(uiState.registered) {
         if (uiState.registered) {
             onRegistered()
-            viewModel.onRegisteredHandled()
+            viewModel.onIntent(RegisterIntent.RegisteredHandled)
         }
     }
 

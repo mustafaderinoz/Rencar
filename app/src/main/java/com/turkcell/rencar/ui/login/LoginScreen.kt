@@ -74,7 +74,7 @@ fun LoginScreen(
     LaunchedEffect(uiState.codeSent) {
         if (uiState.codeSent) {
             onNavigateToOtp(uiState.phone)
-            viewModel.onCodeSentHandled()
+            viewModel.onIntent(LoginIntent.CodeSentHandled)
         }
     }
 
@@ -82,7 +82,7 @@ fun LoginScreen(
     LaunchedEffect(uiState.navigateToRegister) {
         if (uiState.navigateToRegister) {
             onNavigateToRegister(uiState.phone)
-            viewModel.onNavigateToRegisterHandled()
+            viewModel.onIntent(LoginIntent.NavigateToRegisterHandled)
         }
     }
 

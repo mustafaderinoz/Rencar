@@ -89,4 +89,10 @@ sealed interface ReservationIntent {
 
     /** Üst baştaki geri butonu — navigasyon Screen katmanında ele alınır (§4.5/§4.6). */
     data object BackClicked : ReservationIntent
+
+    /** Ekran [ReservationUiState.reserved] geçişini yaptı → bayrak tüketilir. */
+    data object ReservedHandled : ReservationIntent
+
+    /** Ekran [ReservationUiState.startedRentalId] geçişini yaptı → değer tüketilir. */
+    data object RentalStartedHandled : ReservationIntent
 }

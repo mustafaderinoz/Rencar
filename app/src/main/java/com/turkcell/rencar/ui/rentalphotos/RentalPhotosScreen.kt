@@ -128,7 +128,7 @@ fun RentalPhotosScreen(
     LaunchedEffect(uiState.started) {
         if (uiState.started) {
             uiState.rentalId?.let { onStart(it) }
-            viewModel.onStartedHandled()
+            viewModel.onIntent(RentalPhotosIntent.StartedHandled)
         }
     }
 
