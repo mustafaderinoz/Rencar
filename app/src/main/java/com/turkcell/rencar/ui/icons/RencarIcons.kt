@@ -691,6 +691,118 @@ object RencarIcons {
         }.build()
     }
 
+    /** Ay (dark_mode) — profil başlığındaki tema toggle'ı AÇIK temadayken bunu gösterir. */
+    val DarkMode: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarDarkMode",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(12f, 3f)
+                curveToRelative(-4.97f, 0f, -9f, 4.03f, -9f, 9f)
+                reflectiveCurveToRelative(4.03f, 9f, 9f, 9f)
+                reflectiveCurveToRelative(9f, -4.03f, 9f, -9f)
+                curveToRelative(0f, -0.46f, -0.04f, -0.92f, -0.1f, -1.36f)
+                curveToRelative(-0.98f, 1.37f, -2.58f, 2.26f, -4.4f, 2.26f)
+                curveToRelative(-2.98f, 0f, -5.4f, -2.42f, -5.4f, -5.4f)
+                curveToRelative(0f, -1.81f, 0.89f, -3.42f, 2.26f, -4.4f)
+                curveToRelative(-0.44f, -0.06f, -0.9f, -0.1f, -1.36f, -0.1f)
+                close()
+            }
+        }.build()
+    }
+
+    /** Güneş (light_mode) — tema toggle'ı KOYU temadayken bunu gösterir. */
+    val LightMode: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "RencarLightMode",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                // Merkez daire
+                moveTo(12f, 7f)
+                curveToRelative(-2.76f, 0f, -5f, 2.24f, -5f, 5f)
+                reflectiveCurveToRelative(2.24f, 5f, 5f, 5f)
+                reflectiveCurveToRelative(5f, -2.24f, 5f, -5f)
+                reflectiveCurveToRelative(-2.24f, -5f, -5f, -5f)
+                close()
+                // Sol / sağ ışın
+                moveTo(2f, 13f)
+                horizontalLineToRelative(2f)
+                curveToRelative(0.55f, 0f, 1f, -0.45f, 1f, -1f)
+                reflectiveCurveToRelative(-0.45f, -1f, -1f, -1f)
+                horizontalLineTo(2f)
+                curveToRelative(-0.55f, 0f, -1f, 0.45f, -1f, 1f)
+                reflectiveCurveToRelative(0.45f, 1f, 1f, 1f)
+                close()
+                moveToRelative(18f, 0f)
+                horizontalLineToRelative(2f)
+                curveToRelative(0.55f, 0f, 1f, -0.45f, 1f, -1f)
+                reflectiveCurveToRelative(-0.45f, -1f, -1f, -1f)
+                horizontalLineToRelative(-2f)
+                curveToRelative(-0.55f, 0f, -1f, 0.45f, -1f, 1f)
+                reflectiveCurveToRelative(0.45f, 1f, 1f, 1f)
+                close()
+                // Üst / alt ışın
+                moveTo(11f, 2f)
+                verticalLineToRelative(2f)
+                curveToRelative(0f, 0.55f, 0.45f, 1f, 1f, 1f)
+                reflectiveCurveToRelative(1f, -0.45f, 1f, -1f)
+                verticalLineTo(2f)
+                curveToRelative(0f, -0.55f, -0.45f, -1f, -1f, -1f)
+                reflectiveCurveToRelative(-1f, 0.45f, -1f, 1f)
+                close()
+                moveToRelative(0f, 18f)
+                verticalLineToRelative(2f)
+                curveToRelative(0f, 0.55f, 0.45f, 1f, 1f, 1f)
+                reflectiveCurveToRelative(1f, -0.45f, 1f, -1f)
+                verticalLineToRelative(-2f)
+                curveToRelative(0f, -0.55f, -0.45f, -1f, -1f, -1f)
+                reflectiveCurveToRelative(-1f, 0.45f, -1f, 1f)
+                close()
+                // Çapraz ışınlar
+                moveTo(5.99f, 4.58f)
+                curveToRelative(-0.39f, -0.39f, -1.03f, -0.39f, -1.41f, 0f)
+                curveToRelative(-0.39f, 0.39f, -0.39f, 1.03f, 0f, 1.41f)
+                lineToRelative(1.06f, 1.06f)
+                curveToRelative(0.39f, 0.39f, 1.03f, 0.39f, 1.41f, 0f)
+                reflectiveCurveToRelative(0.39f, -1.03f, 0f, -1.41f)
+                lineTo(5.99f, 4.58f)
+                close()
+                moveToRelative(12.37f, 12.37f)
+                curveToRelative(-0.39f, -0.39f, -1.03f, -0.39f, -1.41f, 0f)
+                curveToRelative(-0.39f, 0.39f, -0.39f, 1.03f, 0f, 1.41f)
+                lineToRelative(1.06f, 1.06f)
+                curveToRelative(0.39f, 0.39f, 1.03f, 0.39f, 1.41f, 0f)
+                curveToRelative(0.39f, -0.39f, 0.39f, -1.03f, 0f, -1.41f)
+                lineToRelative(-1.06f, -1.06f)
+                close()
+                moveToRelative(1.06f, -10.96f)
+                curveToRelative(0.39f, -0.39f, 0.39f, -1.03f, 0f, -1.41f)
+                curveToRelative(-0.39f, -0.39f, -1.03f, -0.39f, -1.41f, 0f)
+                lineToRelative(-1.06f, 1.06f)
+                curveToRelative(-0.39f, 0.39f, -0.39f, 1.03f, 0f, 1.41f)
+                reflectiveCurveToRelative(1.03f, 0.39f, 1.41f, 0f)
+                lineToRelative(1.06f, -1.06f)
+                close()
+                moveTo(7.05f, 18.36f)
+                curveToRelative(0.39f, -0.39f, 0.39f, -1.03f, 0f, -1.41f)
+                curveToRelative(-0.39f, -0.39f, -1.03f, -0.39f, -1.41f, 0f)
+                lineToRelative(-1.06f, 1.06f)
+                curveToRelative(-0.39f, 0.39f, -0.39f, 1.03f, 0f, 1.41f)
+                reflectiveCurveToRelative(1.03f, 0.39f, 1.41f, 0f)
+                lineToRelative(1.06f, -1.06f)
+                close()
+            }
+        }.build()
+    }
+
     /** Onaylı kalkan (verified_user) — ehliyet doğrulama durumu ikonu. */
     val Shield: ImageVector by lazy {
         ImageVector.Builder(

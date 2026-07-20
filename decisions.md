@@ -665,3 +665,31 @@ Projede verilen bütün mimarisel-teknik kararları ve karar geçmişini içeren
 - **Dokunulan/eklenen dosyalar:** güncellenen `data/remote/api/ReservationApi` (cancel), `data/repository/ReservationRepository` (cancelReservation), `util/ErrorMessages` (RESERVATION_CANCEL), `ui/rentalphotos/{RentalPhotosContract,RentalPhotosViewModel,RentalPhotosScreen}` (iki mod + yerel çekim + geri sayım + Başlat zinciri + iptal), `ui/navigation/{RencarNavHost,RencarDestinations}` (onCancelled + yorum). `RentalPhotosViewModel`'den `appScope` (yalnız eski `onCleared` iptali için vardı) kaldırıldı.
 
 - Not (20.07.2026): **KOD HİZALANDI — `:app:compileDebugKotlin` başarılı.** Emülatör/cihaz doğrulaması yapılmadı (CUSTOMER hesabı + aktif rezervasyon state'i gerektirir).
+
+
+---
+
+### Tema Modu (Koyu/Açık) — Uygulama İçi Kullanıcı Tercihi
+
+- Seçim: **Tema tercihi DataStore'da (`data/local/ThemeStore`) `Boolean?` olarak saklanır ve profil başlığındaki gece/gündüz butonuyla değiştirilir. Tek tema kaynağı `MainViewModel.darkTheme` → `MainActivity` → `RenCarTheme(darkTheme = ...)` zinciridir; tercih değişince tüm ekranlar anında yeniden çizilir (uygulamayı kapatmaya gerek yok).** Üç durumlu değer: `null` = kullanıcı henüz seçmedi → **sistem teması** takip edilir; `true`/`false` = kullanıcının açık seçimi (bundan sonra sistem ayarı takip edilmez).
+
+- Son Güncelleme Tarihi: 20.07.2026
+
+- Alternatifler: **3 durumlu döngü (Sistem → Açık → Koyu)** — tek ikonla hangi durumda olunduğu anlaşılmadığından ve kullanıcı "bastığında dark/light olsun" dediğinden 2 durumlu toggle seçildi. **`AppCompatDelegate.setDefaultNightMode`** — Activity yeniden yaratır (Compose state'i sarsar), Compose-native `darkTheme` parametresi varken gereksiz.
+
+- Sebep: `RenCarTheme` yalnız `isSystemInDarkTheme()` ile besleniyordu; kullanıcı tema değiştirmek için **uygulamadan çıkıp sistem ayarına gitmek zorundaydı**. `RenCarTheme` zaten `darkTheme` parametresi aldığından tema motoru DEĞİŞMEDİ ("Minimum Değişiklik İlkesi") — yalnız parametrenin kaynağı sistemden kalıcı tercihe taşındı.
+
+- **Kararlar/sapmalar:**
+  - **`TokenStore.clear()` düzeltildi (davranış değişikliği):** eskiden `prefs.clear()` ile DataStore'un TAMAMINI siliyordu; tema tercihi aynı store'da tutulduğundan çıkış yapan kullanıcının teması da sıfırlanırdı. Artık yalnız `access_token`/`refresh_token` anahtarları `remove` edilir. Tema oturumdan bağımsızdır (login ekranında da geçerlidir).
+  - **Ayrı DataStore dosyası açılmadı:** mevcut `rencar_prefs` örneği paylaşılır (decisions.md "Token Saklama" ile aynı kalıp).
+  - **Yeni ViewModel yok:** tercih, uygulama seviyesi mevcut `MainViewModel`'e eklendi (`forcedLogout` yanına). `ProfileViewModel` aynı `ThemeStore`'u dinler → iki taraf da tek kaynaktan (DataStore) beslendiği için senkronizasyon gerekmez.
+  - **Sistem teması sorgusu VM'e sızmaz (§4.5):** `ProfileUiState.darkTheme` ham tercihi (`Boolean?`) taşır; geçerli temayı ekran `?: isSystemInDarkTheme()` ile çözer ve hedefi `ProfileIntent.ThemeToggled(dark)` ile VM'e bildirir.
+  - **Yeni ikonlar (§2.2 sapması — kullanıcı açıkça istedi):** `RencarIcons`'ta güneş/ay yoktu ve tasarımda da yok; Material Symbols `dark_mode`/`light_mode` mevcut kalıpla eklendi. Buton koyu temada güneş, açık temada ay gösterir (yapılacak eylemi anlatır).
+  - **Açılışta kısa sistem-teması karesi:** `MainViewModel.darkTheme` `initialValue = null` ile başlar; DataStore ilk emisyona kadar (bir kare) sistem teması geçerlidir. Splash zaten kısa olduğundan ek bir yükleme kapısı eklenmedi.
+  - Profil başlığındaki kare buton kalıbı `HeaderIconButton` olarak ortaklaştırıldı (kopyalanmadı); "Düzenle" butonunun görünümü/davranışı değişmedi (hâlâ statik).
+
+- **Yeni bağımlılık YOK.** Mevcut DataStore + Hilt + Compose yeterli.
+
+- **Dokunulan/eklenen dosyalar:** yeni `data/local/ThemeStore`; güncellenen `data/local/TokenStore` (clear → yalnız token anahtarları), `ui/MainViewModel` (darkTheme), `MainActivity` (RenCarTheme'e tercih), `ui/icons/RencarIcons` (DarkMode/LightMode), `ui/profile/{ProfileContract,ProfileViewModel,ProfileScreen}`.
+
+- Not (20.07.2026): **KOD HİZALANDI — `:app:assembleDebug` başarılı.** Emülatör/cihaz doğrulaması yapılmadı.

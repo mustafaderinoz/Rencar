@@ -24,6 +24,11 @@ data class ProfileUiState(
     val showLogoutConfirm: Boolean = false,
     /** Çıkış isteği sürüyor mu (onay butonunda spinner + tekrar-basma koruması). */
     val isLoggingOut: Boolean = false,
+    /**
+     * Kayıtlı tema tercihi (ThemeStore): `null` = kullanıcı seçmedi, sistem teması geçerli.
+     * Ekran, gösterilecek ikonu bu değer ile `isSystemInDarkTheme()`i birleştirerek çözer.
+     */
+    val darkTheme: Boolean? = null,
 )
 
 /**
@@ -44,4 +49,10 @@ sealed interface ProfileIntent {
 
     /** Onay pop-up'ında "Çıkış yap" → oturumu kapatır (POST /auth/logout → NavHost login'e döner). */
     data object ConfirmLogout : ProfileIntent
+
+    /**
+     * Başlıktaki gece/gündüz butonuna basıldı. Hedef değeri EKRAN hesaplar (o an geçerli temanın
+     * tersi); böylece sistem teması sorgusu (`isSystemInDarkTheme()`) ViewModel'e sızmaz.
+     */
+    data class ThemeToggled(val dark: Boolean) : ProfileIntent
 }

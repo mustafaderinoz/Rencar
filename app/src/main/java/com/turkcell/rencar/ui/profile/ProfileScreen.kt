@@ -3,6 +3,7 @@ package com.turkcell.rencar.ui.profile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -117,7 +118,12 @@ private fun ProfileContent(uiState: ProfileUiState, onIntent: (ProfileIntent) ->
     ) {
         Spacer(Modifier.height(16.dp))
 
-        ProfileHeader(fullName = uiState.fullName, phone = uiState.phone)
+        ProfileHeader(
+            fullName = uiState.fullName,
+            phone = uiState.phone,
+            darkTheme = uiState.darkTheme,
+            onIntent = onIntent,
+        )
 
         Spacer(Modifier.height(20.dp))
 
@@ -170,9 +176,17 @@ private fun ProfileContent(uiState: ProfileUiState, onIntent: (ProfileIntent) ->
     }
 }
 
-// ── Başlık: avatar (baş harfler) + ad/telefon + düzenle butonu ──
+// ── Başlık: avatar (baş harfler) + ad/telefon + tema toggle'ı + düzenle butonu ──
 @Composable
-private fun ProfileHeader(fullName: String, phone: String) {
+private fun ProfileHeader(
+    fullName: String,
+    phone: String,
+    darkTheme: Boolean?,
+    onIntent: (ProfileIntent) -> Unit,
+) {
+    // Geçerli tema: kullanıcı seçimi varsa o, yoksa sistem ayarı (MainActivity ile aynı kural).
+    val isDark = darkTheme ?: isSystemInDarkTheme()
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
@@ -210,27 +224,50 @@ private fun ProfileHeader(fullName: String, phone: String) {
 
         Spacer(Modifier.width(12.dp))
 
-        // Düzenle (statik) — Login geri butonuyla aynı yumuşak kare kalıbı.
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerLowest)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(14.dp),
-                )
-                .clickable { },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = RencarIcons.Edit,
-                contentDescription = "Profili düzenle",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
+        // Tema toggle'ı: koyu temadayken güneş (aydınlığa geç), açık temadayken ay (karanlığa geç).
+        HeaderIconButton(
+            icon = if (isDark) RencarIcons.LightMode else RencarIcons.DarkMode,
+            contentDescription = if (isDark) "Açık temaya geç" else "Koyu temaya geç",
+            onClick = { onIntent(ProfileIntent.ThemeToggled(dark = !isDark)) },
+        )
+
+        Spacer(Modifier.width(8.dp))
+
+        // Düzenle (statik)
+        HeaderIconButton(
+            icon = RencarIcons.Edit,
+            contentDescription = "Profili düzenle",
+            onClick = { },
+        )
+    }
+}
+
+/** Başlıktaki kare aksiyon butonu — Login geri butonuyla aynı yumuşak kare kalıbı. */
+@Composable
+private fun HeaderIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(14.dp),
             )
-        }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

@@ -36,7 +36,15 @@ class TokenStore @Inject constructor(
     /** SessionManager'ın refresh çağrısı için tek seferlik okuma (POST /auth/refresh gövdesi). */
     suspend fun currentRefreshToken(): String? = dataStore.data.first()[refreshTokenKey]
 
+    /**
+     * Yalnız oturum anahtarlarını siler — DataStore'un tamamı DEĞİL. Aynı store'da oturumdan
+     * bağımsız tercihler de tutulur (bkz. [ThemeStore]); `clear()` çağrılsaydı çıkış yapan
+     * kullanıcının tema seçimi de silinirdi.
+     */
     suspend fun clear() {
-        dataStore.edit { it.clear() }
+        dataStore.edit { prefs ->
+            prefs.remove(accessTokenKey)
+            prefs.remove(refreshTokenKey)
+        }
     }
 }

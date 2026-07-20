@@ -2,6 +2,7 @@ package com.turkcell.rencar.ui.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.turkcell.rencar.data.local.ThemeStore
 import com.turkcell.rencar.data.model.LicenseVerificationStatus
 import com.turkcell.rencar.data.repository.AuthRepository
 import com.turkcell.rencar.data.repository.LicenseRepository
@@ -26,10 +27,21 @@ import kotlinx.coroutines.launch
 class ProfileViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val licenseRepository: LicenseRepository,
+    private val themeStore: ThemeStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+
+    init {
+        // Tema tercihi tek kaynaktan (ThemeStore) akar; MainActivity da aynı kaynağı dinlediği için
+        // buradan yapılan değişiklik tüm uygulamaya anında yansır.
+        viewModelScope.launch {
+            themeStore.darkTheme.collect { dark ->
+                _uiState.update { it.copy(darkTheme = dark) }
+            }
+        }
+    }
 
     fun onIntent(intent: ProfileIntent) {
         when (intent) {
@@ -37,6 +49,9 @@ class ProfileViewModel @Inject constructor(
             ProfileIntent.LogoutClicked -> _uiState.update { it.copy(showLogoutConfirm = true) }
             ProfileIntent.DismissLogout -> _uiState.update { it.copy(showLogoutConfirm = false) }
             ProfileIntent.ConfirmLogout -> logout()
+            is ProfileIntent.ThemeToggled -> viewModelScope.launch {
+                themeStore.setDarkTheme(intent.dark)
+            }
         }
     }
 
